@@ -16,6 +16,6 @@ public record PatientReadDto(
     DateTime? BirthDate,
     string? Email,
     string? Phone,
-    string UserId);
+    string? UserId);
 
 public record PatientUpdateDto(string FullName, DateTime? BirthDate, string? Email, string? Phone);

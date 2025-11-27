@@ -244,7 +244,6 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("longtext");
 
                     b.Property<string>("UserId")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.HasKey("Id");

@@ -211,10 +211,13 @@ public class PatientsController : ControllerBase
         _db.Remove(p);
         await _db.SaveChangesAsync();
 
-        var user = await _userManager.FindByIdAsync(p.UserId);
-        if (user is not null)
+        if (!string.IsNullOrWhiteSpace(p.UserId))
         {
-            await _userManager.DeleteAsync(user);
+            var user = await _userManager.FindByIdAsync(p.UserId);
+            if (user is not null)
+            {
+                await _userManager.DeleteAsync(user);
+            }
         }
         return NoContent();
     }

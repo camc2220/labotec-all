@@ -34,7 +34,6 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
                 .HasMaxLength(30);
 
             entity.Property(p => p.UserId)
-                .IsRequired()
                 .HasMaxLength(255);
 
             entity.HasIndex(p => p.DocumentId).IsUnique();

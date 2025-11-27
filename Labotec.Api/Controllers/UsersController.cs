@@ -210,6 +210,31 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    [Authorize]
+    [HttpPut("me/password")]
+    public async Task<IActionResult> ChangeOwnPassword([FromBody] UserChangePasswordDto dto)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (currentUserId is null)
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(currentUserId);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var changeResult = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+        if (!changeResult.Succeeded)
+        {
+            return BadRequest(changeResult.Errors);
+        }
+
+        return NoContent();
+    }
+
     [Authorize(Roles = "Admin")]
     [HttpPost("{id}/reset-password")]
     public async Task<IActionResult> ResetPassword(string id, [FromBody] UserAdminChangePasswordDto dto)
