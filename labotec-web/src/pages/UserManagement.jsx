@@ -39,6 +39,7 @@ export default function UserManagement() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [updatingMap, setUpdatingMap] = useState({})
+  const [resettingMap, setResettingMap] = useState({})
 
   const resolveUserIdentifier = user => {
     if (!user) return undefined
@@ -161,6 +162,30 @@ export default function UserManagement() {
     }
   }
 
+  const handleResetPassword = async target => {
+    if (!isAdmin) return
+    const entityId = resolveUserIdentifier(target)
+    if (!entityId) return
+
+    setError('')
+    setSuccessMessage('')
+    setResettingMap(prev => ({ ...prev, [entityId]: true }))
+
+    try {
+      await api.post(`/api/users/${entityId}/reset-password`, {})
+      setSuccessMessage('Contraseña restablecida a la clave genérica: Labotec1@')
+    } catch (err) {
+      console.error(err)
+      setError('No pudimos restablecer la contraseña. Intenta nuevamente más tarde.')
+    } finally {
+      setResettingMap(prev => {
+        const copy = { ...prev }
+        delete copy[entityId]
+        return copy
+      })
+    }
+  }
+
   const columns = useMemo(() => {
     if (!isAdmin) return []
     return [
@@ -233,8 +258,26 @@ export default function UserManagement() {
           )
         },
       },
+      {
+        key: 'credentials',
+        header: 'Credenciales',
+        render: row => {
+          if (row.role === 'admin') return <span className="text-xs text-slate-500">—</span>
+          const entityId = resolveEntityId(row)
+          const isResetting = !!resettingMap[entityId]
+          return (
+            <button
+              className="text-xs font-semibold text-sky-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+              onClick={() => handleResetPassword(row)}
+              disabled={isResetting}
+            >
+              {isResetting ? 'Restableciendo...' : 'Restablecer'}
+            </button>
+          )
+        },
+      },
     ]
-  }, [isAdmin, updatingMap])
+  }, [isAdmin, resettingMap, updatingMap])
 
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
