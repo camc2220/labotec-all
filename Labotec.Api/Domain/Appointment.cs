@@ -1,0 +1,1 @@
+namespace Labotec.Api.Domain; public class Appointment { public Guid Id {get;set;} = Guid.NewGuid(); public Guid PatientId {get;set;} public Patient Patient {get;set;}=default!; public DateTime ScheduledAt {get;set;} public string Type {get;set;} = "Laboratorio"; public string? Notes {get;set;} public string Status {get;set;} = "Scheduled"; }
