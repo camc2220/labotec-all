@@ -1,3 +1,4 @@
+using Labotec.Api.Common;
 using Labotec.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -34,7 +35,11 @@ public class UsersController : ControllerBase
             Email = dto.Email
         };
 
-        var createResult = await _userManager.CreateAsync(user, dto.Password);
+        var initialPassword = string.IsNullOrWhiteSpace(dto.Password)
+            ? PasswordDefaults.GenericPassword
+            : dto.Password;
+
+        var createResult = await _userManager.CreateAsync(user, initialPassword);
         if (!createResult.Succeeded)
         {
             return BadRequest(createResult.Errors);
@@ -216,7 +221,7 @@ public class UsersController : ControllerBase
         }
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var resetResult = await _userManager.ResetPasswordAsync(user, token, dto.NewPassword);
+        var resetResult = await _userManager.ResetPasswordAsync(user, token, PasswordDefaults.GenericPassword);
         if (!resetResult.Succeeded)
         {
             return BadRequest(resetResult.Errors);
