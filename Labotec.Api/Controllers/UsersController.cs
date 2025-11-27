@@ -205,6 +205,26 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpPost("{id}/reset-password")]
+    public async Task<IActionResult> ResetPassword(string id, [FromBody] UserAdminChangePasswordDto dto)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var resetResult = await _userManager.ResetPasswordAsync(user, token, dto.NewPassword);
+        if (!resetResult.Succeeded)
+        {
+            return BadRequest(resetResult.Errors);
+        }
+
+        return NoContent();
+    }
+
     private async Task<UserReadDto> ToReadDto(IdentityUser user)
     {
         var roles = await _userManager.GetRolesAsync(user);

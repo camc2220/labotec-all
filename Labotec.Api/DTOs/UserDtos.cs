@@ -51,3 +51,10 @@ public record UserUpdateDto(
 public record UserChangePasswordDto(
     string CurrentPassword,
     string NewPassword);
+
+/// <summary>
+/// Solicitud para que un administrador restablezca la contraseña de un usuario.
+/// </summary>
+/// <param name="NewPassword">Nueva contraseña a establecer.</param>
+public record UserAdminChangePasswordDto(
+    string NewPassword);

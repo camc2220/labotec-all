@@ -145,7 +145,7 @@ public class PatientsController : ControllerBase
             ? patient.Email!
             : (!string.IsNullOrWhiteSpace(patient.DocumentId) ? patient.DocumentId : $"paciente-{Guid.NewGuid():N}");
 
-        var tempPassword = $"Paciente#{Guid.NewGuid().ToString("N")[..8]}";
+        const string tempPassword = "123456";
 
         var user = new IdentityUser
         {
