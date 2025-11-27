@@ -1,3 +1,4 @@
+using Labotec.Api.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -35,7 +36,7 @@ public static class Seed
                 Email = "admin@labotec.local"
             };
 
-            var createResult = await userMgr.CreateAsync(admin, "Admin#2025!");
+            var createResult = await userMgr.CreateAsync(admin, PasswordDefaults.GenericPassword);
             if (!createResult.Succeeded)
             {
                 throw new Exception("Error creando usuario admin: " +

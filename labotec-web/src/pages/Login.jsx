@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 export default function Login() {
   const [userName, setUserName] = useState('admin')
-  const [password, setPassword] = useState('Admin#2025!')
+  const [password, setPassword] = useState('Labotec1@')
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const { login } = useAuth()
