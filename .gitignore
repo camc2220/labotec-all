@@ -1,16 +1,154 @@
-# Node rules:
-## Grunt intermediate storage (http://gruntjs.com/creating-plugins#storing-task-files)
-.grunt
+##############################
+# .NET / ASP.NET CORE
+##############################
 
-## Dependency directory
-## Commenting this out is preferred by some people, see
-## https://docs.npmjs.com/misc/faq#should-i-check-my-node_modules-folder-into-git
-node_modules
+bin/
+obj/
+**/bin/
+**/obj/
+artifacts/
+*.user
+*.suo
+*.cache
+*.config
+*.log
+*.tmp
 
-# Book build output
-_book
+# Publish output
+publish/
+out/
 
-# eBook build output
-*.epub
-*.mobi
-*.pdf
+# EF Core
+Migrations/*Designer.cs
+Migrations/*.ModelSnapshot.cs
+
+# Sensitive configs
+appsettings.Local.json
+appsettings.Development.json
+appsettings.*.json
+**/secrets.json
+
+# Keys
+*.pfx
+*.snk
+*.key
+*.pem
+
+##############################
+# NODE / REACT / VITE
+##############################
+
+node_modules/
+dist/
+vite.config.timestamp-*.mjs
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+##############################
+# DOCKER
+##############################
+
+docker-compose.override.yml
+docker-data/
+mysql-data/
+*.tar
+**/data/
+**/.docker/
+
+##############################
+# MYSQL / DATABASE
+##############################
+
+*.sql
+*.db
+*.bak
+*.sql.gz
+data/
+mysql/
+db/
+
+##############################
+# SWAGGER
+##############################
+
+swagger-custom.js
+wwwroot/swagger/*
+wwwroot/swagger/*-bundle.js
+
+##############################
+# LOGS
+##############################
+
+*.log
+logs/
+Logs/
+log/
+*.nlog
+*.json.log
+
+##############################
+# ONE DRIVE (IMPORTANT)
+##############################
+
+# OneDrive duplicate files
+*.lnk
+~$*
+*.tmp
+*.DS_Store
+**/OneDrive*/
+**/OneDrive - */ 
+
+##############################
+# VISUAL STUDIO
+##############################
+
+.vs/
+.vscode/
+.idea/
+*.csproj.user
+*.sln.docstates
+
+##############################
+# OS / EDITOR / TEMP
+##############################
+
+Thumbs.db
+.DS_Store
+*.swp
+*.swo
+*.orig
+*.tmp
+*.temp
+~$*
+
+##############################
+# PYTHON (if used)
+##############################
+__pycache__/
+*.pyc
+
+##############################
+# FRONTEND BUILD ARTIFACTS
+##############################
+
+*.gz
+*.map
+
+##############################
+# JETBRAINS / RIDER
+##############################
+
+.idea/
+*.iws
+*.iml
+*.ipr
