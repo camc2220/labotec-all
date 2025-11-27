@@ -14,6 +14,23 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactivo' },
 ]
 
+const normalizeRole = roles => {
+  const list = Array.isArray(roles) ? roles : roles ? [roles] : []
+  if (list.some(r => r && r.toLowerCase() === 'admin')) return 'admin'
+  return 'patient'
+}
+
+const toApiRole = role => (role === 'admin' ? 'Admin' : 'Paciente')
+
+const resolveStatus = (isLocked, lockoutEnd) => {
+  if (isLocked) return 'inactive'
+  if (lockoutEnd) {
+    const lockDate = new Date(lockoutEnd)
+    if (!Number.isNaN(lockDate.valueOf()) && lockDate > new Date()) return 'inactive'
+  }
+  return 'active'
+}
+
 export default function UserManagement() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -40,11 +57,21 @@ export default function UserManagement() {
 
   const normalizeUsers = data => {
     if (!data) return []
-    if (Array.isArray(data)) return data
-    if (Array.isArray(data?.items)) return data.items
-    if (Array.isArray(data?.Users)) return data.Users
-    if (Array.isArray(data?.results)) return data.results
-    return []
+    const rawUsers = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.Users)
+          ? data.Users
+          : Array.isArray(data?.results)
+            ? data.results
+            : []
+
+    return rawUsers.map(item => {
+      const role = normalizeRole(item.roles ?? item.Roles)
+      const status = resolveStatus(item.isLocked ?? item.IsLocked, item.lockoutEnd ?? item.LockoutEnd)
+      return { ...item, role, status }
+    })
   }
 
   const fetchUsers = async () => {
@@ -92,7 +119,7 @@ export default function UserManagement() {
     updateLocalRole(entityId, newRole)
 
     try {
-      await api.put(`/api/users/${entityId}`, { role: newRole })
+      await api.put(`/api/users/${entityId}`, { roles: [toApiRole(newRole)] })
       setSuccessMessage('El rol del usuario se actualizó correctamente.')
     } catch (err) {
       console.error(err)
@@ -119,7 +146,7 @@ export default function UserManagement() {
     updateLocalStatus(entityId, newStatus)
 
     try {
-      await api.put(`/api/users/${entityId}`, { status: newStatus })
+      await api.put(`/api/users/${entityId}`, { lockout: newStatus === 'inactive' })
       setSuccessMessage('El estado del usuario se actualizó correctamente.')
     } catch (err) {
       console.error(err)
@@ -152,9 +179,13 @@ export default function UserManagement() {
         key: 'status',
         header: 'Estado',
         render: row => (
-          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs ${row.status === 'inactive' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-            {row.status === 'inactive' ? 'Inactivo' : 'Activo'}
-          </span>
+          row.role === 'admin' ? (
+            <span className="text-xs text-slate-500">—</span>
+          ) : (
+            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs ${row.status === 'inactive' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
+              {row.status === 'inactive' ? 'Inactivo' : 'Activo'}
+            </span>
+          )
         ),
       },
       {
@@ -183,6 +214,7 @@ export default function UserManagement() {
         key: 'statusActions',
         header: 'Cambiar estado',
         render: row => {
+          if (row.role === 'admin') return <span className="text-xs text-slate-500">—</span>
           const entityId = resolveEntityId(row)
           const isUpdating = !!updatingMap[entityId]
           return (

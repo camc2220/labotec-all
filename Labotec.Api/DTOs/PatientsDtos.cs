@@ -6,8 +6,8 @@ public record PatientCreateDto(
     DateTime? BirthDate,
     string? Email,
     string? Phone,
-    string UserName,
-    string Password);
+    string? UserName,
+    string? Password);
 
 public record PatientReadDto(
     Guid Id,

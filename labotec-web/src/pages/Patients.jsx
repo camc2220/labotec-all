@@ -84,7 +84,7 @@ export default function Patients() {
     setFormError('')
     setSaving(true)
     try {
-      const payload = { ...formData, role: 'patient' }
+      const payload = { ...formData }
       if (editingItem) {
         await api.put(`/api/patients/${resolveEntityId(editingItem)}`, payload)
       } else {
@@ -130,8 +130,12 @@ export default function Patients() {
     setCreatingMap(prev => ({ ...prev, [id]: true }))
 
     try {
-      await api.post(`/api/patients/${id}/create-user`)
-      setSuccessMessage('Se creó el usuario del paciente correctamente.')
+      const res = await api.post(`/api/patients/${id}/create-user`)
+      const credentials = res.data
+      const extra = credentials?.userName && credentials?.password
+        ? ` (${credentials.userName} / ${credentials.password})`
+        : ''
+      setSuccessMessage(`Se creó el usuario del paciente correctamente${extra}.`)
       fetchData()
     } catch (err) {
       console.error(err)

@@ -62,37 +62,40 @@ public class PatientsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PatientReadDto>> Create([FromBody] PatientCreateDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.UserName)) return BadRequest("Nombre de usuario es requerido");
-        if (string.IsNullOrWhiteSpace(dto.Password)) return BadRequest("Contraseña es requerida");
-
-        var user = new IdentityUser
-        {
-            UserName = dto.UserName,
-            Email = dto.Email
-        };
-
-        var identityResult = await _userManager.CreateAsync(user, dto.Password);
-        if (!identityResult.Succeeded)
-        {
-            return BadRequest(identityResult.Errors);
-        }
-
-        var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
-        if (!roleResult.Succeeded)
-        {
-            await _userManager.DeleteAsync(user);
-            return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
-        }
-
         var entity = new Domain.Patient
         {
             FullName = dto.FullName,
             DocumentId = dto.DocumentId,
             BirthDate = dto.BirthDate,
             Email = dto.Email,
-            Phone = dto.Phone,
-            UserId = user.Id
+            Phone = dto.Phone
         };
+
+        IdentityUser? user = null;
+
+        if (!string.IsNullOrWhiteSpace(dto.UserName) && !string.IsNullOrWhiteSpace(dto.Password))
+        {
+            user = new IdentityUser
+            {
+                UserName = dto.UserName,
+                Email = dto.Email
+            };
+
+            var identityResult = await _userManager.CreateAsync(user, dto.Password);
+            if (!identityResult.Succeeded)
+            {
+                return BadRequest(identityResult.Errors);
+            }
+
+            var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
+            if (!roleResult.Succeeded)
+            {
+                await _userManager.DeleteAsync(user);
+                return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
+            }
+
+            entity.UserId = user.Id;
+        }
 
         _db.Patients.Add(entity);
 
@@ -102,22 +105,80 @@ public class PatientsController : ControllerBase
         }
         catch
         {
-            await _userManager.DeleteAsync(user);
+            if (user is not null)
+            {
+                await _userManager.DeleteAsync(user);
+            }
+
             throw;
         }
 
-        // AQUÍ ES CLAVE: Usamos AppClaims.PatientId que ahora vale "patientId" (minúscula)
-        var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, entity.Id.ToString()));
+        if (user is not null)
+        {
+            // AQUÍ ES CLAVE: Usamos AppClaims.PatientId que ahora vale "patientId" (minúscula)
+            var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, entity.Id.ToString()));
+            if (!claimResult.Succeeded)
+            {
+                _db.Patients.Remove(entity);
+                await _db.SaveChangesAsync();
+                await _userManager.DeleteAsync(user);
+                return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
+            }
+        }
+
+        var result = new PatientReadDto(entity.Id, entity.FullName, entity.DocumentId, entity.BirthDate, entity.Email, entity.Phone, entity.UserId);
+        return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPost("{id:guid}/create-user")]
+    public async Task<ActionResult> CreateUser(Guid id)
+    {
+        var patient = await _db.Patients.FindAsync(id);
+        if (patient is null) return NotFound();
+        if (!string.IsNullOrWhiteSpace(patient.UserId))
+        {
+            return BadRequest(new { message = "El paciente ya tiene un usuario asignado." });
+        }
+
+        var userName = !string.IsNullOrWhiteSpace(patient.Email)
+            ? patient.Email!
+            : (!string.IsNullOrWhiteSpace(patient.DocumentId) ? patient.DocumentId : $"paciente-{Guid.NewGuid():N}");
+
+        var tempPassword = $"Paciente#{Guid.NewGuid().ToString("N")[..8]}";
+
+        var user = new IdentityUser
+        {
+            UserName = userName,
+            Email = patient.Email
+        };
+
+        var createResult = await _userManager.CreateAsync(user, tempPassword);
+        if (!createResult.Succeeded)
+        {
+            return BadRequest(createResult.Errors);
+        }
+
+        var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
+        if (!roleResult.Succeeded)
+        {
+            await _userManager.DeleteAsync(user);
+            return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
+        }
+
+        patient.UserId = user.Id;
+        await _db.SaveChangesAsync();
+
+        var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, patient.Id.ToString()));
         if (!claimResult.Succeeded)
         {
-            _db.Patients.Remove(entity);
+            patient.UserId = null;
             await _db.SaveChangesAsync();
             await _userManager.DeleteAsync(user);
             return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
         }
 
-        var result = new PatientReadDto(entity.Id, entity.FullName, entity.DocumentId, entity.BirthDate, entity.Email, entity.Phone, entity.UserId);
-        return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
+        return Ok(new { userId = user.Id, userName = user.UserName, password = tempPassword });
     }
 
     [HttpPut("{id:guid}")]

@@ -1,5 +1,6 @@
 
 using System.Security.Claims;
+using System.Linq;
 using Labotec.Api.Auth;
 using Labotec.Api.Data;
 using Labotec.Api.DTOs;
@@ -115,7 +116,24 @@ namespace Labotec.Api.Controllers
             }
 
             var token = await _jwt.CreateAsync(user, _userManager);
-            return Ok(new { token });
+            var roles = await _userManager.GetRolesAsync(user);
+            var claims = await _userManager.GetClaimsAsync(user);
+            var patientId = claims.FirstOrDefault(c => c.Type == AppClaims.PatientId)?.Value;
+
+            var normalizedRole = roles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase))
+                ? "admin"
+                : "patient";
+
+            return Ok(new
+            {
+                token,
+                user = new
+                {
+                    name = user.UserName,
+                    role = normalizedRole,
+                    patientId
+                }
+            });
         }
     }
 }

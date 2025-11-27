@@ -4,12 +4,43 @@ import api from '../lib/api'
 const STORAGE_KEY = 'auth:user'
 const AuthContext = createContext(null)
 
-function normalizeUser({ name, role, patientId }, fallbackName) {
-  const normalizedRole = role || (fallbackName === 'admin' ? 'admin' : 'patient')
+function parseJwt(token) {
+  if (!token) return null
+  try {
+    const [, payload] = token.split('.')
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(normalized)
+    return JSON.parse(decoded)
+  } catch {
+    return null
+  }
+}
+
+function normalizeRole(rawRoles) {
+  const roles = Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : []
+  if (roles.some(r => r && r.toLowerCase() === 'admin')) return 'admin'
+  return 'patient'
+}
+
+function getUserFromToken(token, fallbackName) {
+  const payload = parseJwt(token)
+  if (!payload) return null
+
+  const role = normalizeRole(payload.role)
+  const patientId = payload.patientId ?? null
+  const name = payload.unique_name || payload.sub || fallbackName || 'Usuario'
+
+  return { name, role, patientId }
+}
+
+function normalizeUser(rawUser, fallbackName, token) {
+  const tokenUser = getUserFromToken(token, fallbackName)
+  const normalizedRole = rawUser?.role || tokenUser?.role || (fallbackName === 'admin' ? 'admin' : 'patient')
+
   return {
-    name: name || fallbackName || 'Usuario',
+    name: rawUser?.name || tokenUser?.name || fallbackName || 'Usuario',
     role: normalizedRole,
-    patientId: patientId ?? null,
+    patientId: rawUser?.patientId ?? tokenUser?.patientId ?? null,
   }
 }
 
@@ -23,9 +54,15 @@ export function AuthProvider({ children }) {
     if (token && storedUser) {
       try {
         const parsed = JSON.parse(storedUser)
-        setUser(normalizeUser(parsed, parsed?.name))
+        setUser(normalizeUser(parsed, parsed?.name, token))
       } catch {
         localStorage.removeItem(STORAGE_KEY)
+      }
+    } else if (token) {
+      const tokenUser = getUserFromToken(token)
+      if (tokenUser) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tokenUser))
+        setUser(tokenUser)
       }
     }
     setLoading(false)
@@ -37,7 +74,7 @@ export function AuthProvider({ children }) {
 
     localStorage.setItem('token', res.data.token)
 
-    const normalized = normalizeUser(res.data?.user ?? {}, userName)
+    const normalized = normalizeUser(res.data?.user ?? {}, userName, res.data.token)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
     setUser(normalized)
   }
