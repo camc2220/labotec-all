@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Linq.Expressions;
 
 namespace Labotec.Api.Common;
@@ -8,8 +9,11 @@ public static class QueryableExtensions
     {
         if (string.IsNullOrWhiteSpace(sortBy)) return source;
 
+        var propertyInfo = typeof(T).GetProperty(sortBy, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance);
+        if (propertyInfo is null) return source;
+
         var parameter = Expression.Parameter(typeof(T), "x");
-        var property = Expression.PropertyOrField(parameter, sortBy);
+        var property = Expression.Property(parameter, propertyInfo);
         var lambda = Expression.Lambda(property, parameter);
 
         var methodName = (sortDir ?? "asc").Equals("desc", StringComparison.OrdinalIgnoreCase)

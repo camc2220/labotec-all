@@ -1,4 +1,5 @@
 using Labotec.Api.Common;
+using Labotec.Api.Data;
 using Labotec.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -12,18 +13,21 @@ namespace Labotec.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class UsersController : ControllerBase
-{
-    private readonly UserManager<IdentityUser> _userManager;
-    private readonly RoleManager<IdentityRole> _roleManager;
-
-    public UsersController(
-        UserManager<IdentityUser> userManager,
-        RoleManager<IdentityRole> roleManager)
+    public class UsersController : ControllerBase
     {
-        _userManager = userManager;
-        _roleManager = roleManager;
-    }
+        private readonly UserManager<IdentityUser> _userManager;
+        private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly AppDbContext _db;
+
+        public UsersController(
+            UserManager<IdentityUser> userManager,
+            RoleManager<IdentityRole> roleManager,
+            AppDbContext db)
+        {
+            _userManager = userManager;
+            _roleManager = roleManager;
+            _db = db;
+        }
 
     [Authorize(Roles = "Admin")]
     [HttpPost]
@@ -84,6 +88,42 @@ public class UsersController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<object>> GetCurrent()
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await _userManager.FindByIdAsync(currentUserId);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var normalizedRole = roles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase))
+            ? "admin"
+            : "patient";
+
+        var patient = await _db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == user.Id);
+
+        return Ok(new
+        {
+            id = user.Id,
+            userName = user.UserName,
+            email = user.Email,
+            role = normalizedRole,
+            name = patient?.FullName ?? user.UserName,
+            phone = patient?.Phone,
+            document = patient?.DocumentId,
+            patientId = patient?.Id
+        });
     }
 
     [Authorize(Roles = "Admin")]
@@ -237,7 +277,7 @@ public class UsersController : ControllerBase
 
     [Authorize(Roles = "Admin")]
     [HttpPost("{id}/reset-password")]
-    public async Task<IActionResult> ResetPassword(string id, [FromBody] UserAdminChangePasswordDto dto)
+    public async Task<IActionResult> ResetPassword(string id, [FromBody] UserAdminChangePasswordDto? dto)
     {
         var user = await _userManager.FindByIdAsync(id);
         if (user is null)
@@ -245,8 +285,12 @@ public class UsersController : ControllerBase
             return NotFound();
         }
 
+        var newPassword = string.IsNullOrWhiteSpace(dto?.NewPassword)
+            ? PasswordDefaults.GenericPassword
+            : dto!.NewPassword;
+
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var resetResult = await _userManager.ResetPasswordAsync(user, token, PasswordDefaults.GenericPassword);
+        var resetResult = await _userManager.ResetPasswordAsync(user, token, newPassword);
         if (!resetResult.Succeeded)
         {
             return BadRequest(resetResult.Errors);

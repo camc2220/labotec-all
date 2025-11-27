@@ -36,7 +36,7 @@ public class PatientsController : ControllerBase
             query = query.Where(p => p.Id == currentPatientId.Value);
         }
         if (!string.IsNullOrWhiteSpace(q))
-            query = query.Where(p => p.FullName.Contains(q) || p.DocumentId.Contains(q));
+            query = query.Where(p => p.FullName.Contains(q) || (p.DocumentId != null && p.DocumentId.Contains(q)));
 
         var total = await query.CountAsync();
         var data = await query
