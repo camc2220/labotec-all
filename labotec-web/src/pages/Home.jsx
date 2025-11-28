@@ -21,6 +21,7 @@ const locations = [
 export default function Home() {
   const initialRegister = {
     fullName: '',
+    documentId: '',
     email: '',
     phone: '',
     birthDate: '',
@@ -31,6 +32,7 @@ export default function Home() {
   const initialAppointment = {
     patientName: '',
     patientId: '',
+    type: '',
     preferredDate: '',
     preferredTime: '',
     location: '',
@@ -66,9 +68,10 @@ export default function Home() {
     try {
       const payload = {
         fullName: registerData.fullName,
+        documentId: registerData.documentId,
         email: registerData.email,
         phone: registerData.phone,
-        birthDate: registerData.birthDate,
+        birthDate: registerData.birthDate ? new Date(registerData.birthDate).toISOString() : null,
         testType: registerData.testType,
         password: registerData.password,
         role: 'patient',
@@ -79,7 +82,8 @@ export default function Home() {
       setRegisterData(initialRegister)
     } catch (error) {
       console.error(error)
-      setRegisterStatus({ type: 'error', message: 'No pudimos completar tu registro en este momento. Por favor intenta más tarde.' })
+      const serverMessage = error?.response?.data?.[0]?.description || 'No pudimos completar tu registro en este momento. Por favor intenta más tarde.'
+      setRegisterStatus({ type: 'error', message: serverMessage })
     } finally {
       setRegisterLoading(false)
     }
@@ -88,18 +92,46 @@ export default function Home() {
   const handleAppointmentSubmit = (event) => {
     event.preventDefault()
 
-    const requiredFields = ['patientName', 'patientId', 'preferredDate', 'preferredTime', 'location']
+    const requiredFields = ['patientName', 'patientId', 'type', 'preferredDate', 'preferredTime', 'location']
     const hasEmptyFields = requiredFields.some((field) => !appointmentData[field])
     if (hasEmptyFields) {
       setAppointmentStatus({ type: 'error', message: 'Necesitamos que completes los datos obligatorios marcados con * para agendar tu cita.' })
       return
     }
 
-    setAppointmentStatus({
-      type: 'success',
-      message: `Tu cita para el ${appointmentData.preferredDate} a las ${appointmentData.preferredTime} ha sido preagendada. Te enviaremos la confirmación final por correo.`
-    })
-    setAppointmentData(initialAppointment)
+    const scheduledAt = new Date(`${appointmentData.preferredDate}T${appointmentData.preferredTime}`)
+
+    if (Number.isNaN(scheduledAt.getTime())) {
+      setAppointmentStatus({ type: 'error', message: 'La fecha y hora seleccionadas no son válidas. Revisa los datos e intenta de nuevo.' })
+      return
+    }
+
+    const payload = {
+      patientId: appointmentData.patientId,
+      scheduledAt: scheduledAt.toISOString(),
+      type: appointmentData.type,
+      notes: [
+        appointmentData.notes,
+        appointmentData.location ? `Sede solicitada: ${appointmentData.location}` : null,
+        appointmentData.patientName ? `Contacto: ${appointmentData.patientName}` : null,
+      ].filter(Boolean).join(' | ')
+    }
+
+    api.post('/api/appointments', payload)
+      .then(() => {
+        setAppointmentStatus({
+          type: 'success',
+          message: `Tu cita para el ${appointmentData.preferredDate} a las ${appointmentData.preferredTime} fue enviada para confirmación.`
+        })
+        setAppointmentData(initialAppointment)
+      })
+      .catch((error) => {
+        console.error(error)
+        const message = error?.response?.status === 401 || error?.response?.status === 403
+          ? 'Inicia sesión con un usuario autorizado para confirmar citas.'
+          : 'No pudimos enviar tu solicitud de cita. Intenta nuevamente o comunícate con recepción.'
+        setAppointmentStatus({ type: 'error', message })
+      })
   }
 
   return (
@@ -235,6 +267,18 @@ export default function Home() {
                 />
               </div>
               <div>
+                <label htmlFor="documentId" className="text-sm font-medium text-gray-700">Documento de identidad *</label>
+                <input
+                  id="documentId"
+                  name="documentId"
+                  value={registerData.documentId}
+                  onChange={handleRegisterChange}
+                  type="text"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  placeholder="Ej. CC 123456789"
+                />
+              </div>
+              <div>
                 <label htmlFor="email" className="text-sm font-medium text-gray-700">Correo electrónico *</label>
                 <input
                   id="email"
@@ -334,6 +378,21 @@ export default function Home() {
                   required
                   label="Paciente registrado"
                 />
+              </div>
+              <div>
+                <label htmlFor="type" className="text-sm font-medium text-gray-700">Tipo de prueba *</label>
+                <select
+                  id="type"
+                  name="type"
+                  value={appointmentData.type}
+                  onChange={handleAppointmentChange}
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                >
+                  <option value="">Selecciona una opción</option>
+                  {testOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
