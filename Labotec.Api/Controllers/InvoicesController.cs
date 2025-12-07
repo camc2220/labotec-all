@@ -21,6 +21,28 @@ public class InvoicesController : ControllerBase
     private bool IsStaff() =>
         User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Facturacion");
 
+    private static bool HasInvalidIssuedAt(DateTime? issuedAt) =>
+        issuedAt.HasValue && (issuedAt.Value == default || issuedAt.Value.Year < 1900);
+
+    private static bool TryNormalizeIssuedAt(DateTime? issuedAt, out DateTime normalized, DateTime? fallback = null)
+    {
+        var candidate = issuedAt ?? fallback ?? DateTime.UtcNow;
+
+        if (HasInvalidIssuedAt(candidate))
+        {
+            candidate = DateTime.UtcNow;
+        }
+
+        if (HasInvalidIssuedAt(candidate))
+        {
+            normalized = default;
+            return false;
+        }
+
+        normalized = DateTime.SpecifyKind(candidate, DateTimeKind.Utc);
+        return true;
+    }
+
     private static InvoiceReadDto ToReadDto(Invoice i)
     {
         var items = i.Items ?? Array.Empty<InvoiceItem>();
@@ -225,6 +247,11 @@ public class InvoicesController : ControllerBase
     [Authorize(Roles = "Admin,Facturacion")]
     public async Task<ActionResult<InvoiceReadDto>> Create([FromBody] InvoiceCreateDto dto)
     {
+        if (!TryNormalizeIssuedAt(dto.IssuedAt, out var issuedAt))
+        {
+            return BadRequest("Fecha de emisión inválida.");
+        }
+
         var patient = await _db.Patients.FindAsync(dto.PatientId);
         if (patient is null) return BadRequest("Paciente no existe");
 
@@ -242,7 +269,7 @@ public class InvoicesController : ControllerBase
             PatientId = dto.PatientId,
             Number = dto.Number,
             Amount = total.Value,
-            IssuedAt = dto.IssuedAt ?? DateTime.UtcNow,
+            IssuedAt = issuedAt,
             Paid = dto.Paid,
             Items = items.ToList()
         };
@@ -266,6 +293,11 @@ public class InvoicesController : ControllerBase
         var i = await _db.Invoices.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id);
         if (i is null) return NotFound();
 
+        if (!TryNormalizeIssuedAt(dto.IssuedAt, out var issuedAt, i.IssuedAt))
+        {
+            return BadRequest("Fecha de emisión inválida.");
+        }
+
         if (i.Number != dto.Number)
         {
             var exists = await _db.Invoices.AnyAsync(x => x.Number == dto.Number && x.Id != id);
@@ -282,7 +314,7 @@ public class InvoicesController : ControllerBase
 
         i.Number = dto.Number;
         i.Amount = total.Value;
-        i.IssuedAt = dto.IssuedAt;
+        i.IssuedAt = issuedAt;
         i.Paid = dto.Paid;
         i.Items = items.ToList();
 
