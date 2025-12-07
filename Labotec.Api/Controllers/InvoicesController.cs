@@ -312,6 +312,8 @@ public class InvoicesController : ControllerBase
             item.InvoiceId = i.Id;
         }
 
+        _db.InvoiceItems.AddRange(items);
+
         i.Number = dto.Number;
         i.Amount = total.Value;
         i.IssuedAt = issuedAt;
