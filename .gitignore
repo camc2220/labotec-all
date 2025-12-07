@@ -6,6 +6,9 @@ bin/
 obj/
 **/bin/
 **/obj/
+# Explicit solution folders
+/Labotec.Api/bin/
+/Labotec.Api/obj/
 artifacts/
 *.user
 *.suo
@@ -39,8 +42,13 @@ appsettings.*.json
 ##############################
 
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 vite.config.timestamp-*.mjs
+# Monorepo layout
+/labotec-web/node_modules/
+/labotec-web/dist/
 
 # Debug logs
 npm-debug.log*
