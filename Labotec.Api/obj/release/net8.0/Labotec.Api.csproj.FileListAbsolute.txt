@@ -260,3 +260,9 @@ C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repos
 C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\obj\release\net8.0\Labotec.Api.pdb
 C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\obj\release\net8.0\Labotec.Api.genruntimeconfig.cache
 C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\obj\release\net8.0\ref\Labotec.Api.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.Caching.Memory.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.DependencyInjection.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.Logging.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Users\Camc2\OneDrive - Universidad Autonoma de Santo Domingo\Documentos\Repositorios\labotec-all\Labotec.Api\bin\release\net8.0\Microsoft.Extensions.Options.dll
