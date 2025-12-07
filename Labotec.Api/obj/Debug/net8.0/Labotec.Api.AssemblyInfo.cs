@@ -13,6 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+238098f3de6ebc929504ef29d5e427c3c42186f3")]
 [assembly: System.Reflection.AssemblyProductAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
