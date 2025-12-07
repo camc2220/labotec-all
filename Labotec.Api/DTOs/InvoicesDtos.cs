@@ -23,5 +23,5 @@ public record InvoiceReadDto(
 public record InvoiceUpdateDto(
     string Number,
     IEnumerable<InvoiceItemCreateDto> Items,
-    DateTime IssuedAt,
+    DateTime? IssuedAt,
     bool Paid);
