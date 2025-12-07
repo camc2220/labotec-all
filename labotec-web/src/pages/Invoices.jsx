@@ -395,6 +395,7 @@ export default function Invoices() {
               <label className="block text-xs text-gray-600 mb-1">Número de factura</label>
               <input
                 value={formData.number}
+                onChange={e => setFormData({ ...formData, number: e.target.value })}
                 readOnly={!editingItem}
                 className="w-full rounded-lg border px-3 py-2 text-sm bg-gray-50"
                 required
