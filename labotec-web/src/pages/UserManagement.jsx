@@ -4,9 +4,18 @@ import Table from '../components/Table'
 import { useAuth } from '../context/AuthContext'
 import { resolveEntityId } from '../lib/entity'
 
+const ROLE_LABELS = {
+  admin: 'Administrador',
+  recepcion: 'Recepción',
+  facturacion: 'Facturación',
+  patient: 'Paciente',
+}
+
 const ROLE_OPTIONS = [
-  { value: 'admin', label: 'Administrador' },
-  { value: 'patient', label: 'Paciente' },
+  { value: 'admin', label: ROLE_LABELS.admin },
+  { value: 'recepcion', label: ROLE_LABELS.recepcion },
+  { value: 'facturacion', label: ROLE_LABELS.facturacion },
+  { value: 'patient', label: ROLE_LABELS.patient },
 ]
 
 const STATUS_OPTIONS = [
@@ -16,11 +25,20 @@ const STATUS_OPTIONS = [
 
 const normalizeRole = roles => {
   const list = Array.isArray(roles) ? roles : roles ? [roles] : []
-  if (list.some(r => r && r.toLowerCase() === 'admin')) return 'admin'
+  const normalized = list.map(r => (r ? r.toString().trim().toLowerCase() : ''))
+
+  if (normalized.some(r => r === 'admin')) return 'admin'
+  if (normalized.some(r => ['recepcion', 'recepción', 'recepcionista', 'reception'].includes(r))) return 'recepcion'
+  if (normalized.some(r => ['facturacion', 'facturación', 'billing'].includes(r))) return 'facturacion'
   return 'patient'
 }
 
-const toApiRole = role => (role === 'admin' ? 'Admin' : 'Paciente')
+const toApiRole = role => {
+  if (role === 'admin') return 'Admin'
+  if (role === 'recepcion') return 'Recepcion'
+  if (role === 'facturacion') return 'Facturacion'
+  return 'Paciente'
+}
 
 const resolveStatus = (isLocked, lockoutEnd) => {
   if (isLocked) return 'inactive'
@@ -196,7 +214,7 @@ export default function UserManagement() {
         header: 'Rol actual',
         render: row => (
           <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-1 text-xs text-sky-700">
-            {row.role === 'admin' ? 'Administrador' : 'Paciente'}
+            {ROLE_LABELS[row.role] ?? ROLE_LABELS.patient}
           </span>
         ),
       },
