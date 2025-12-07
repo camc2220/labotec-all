@@ -176,8 +176,10 @@ public class PatientsMeController : ControllerBase
         if (to.HasValue) query = query.Where(i => i.IssuedAt <= to.Value);
 
         var total = await query.CountAsync();
+        var orderBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Invoice.IssuedAt) : sortBy;
+
         var data = await query
-            .ApplyOrdering(sortBy, sortDir)
+            .ApplyOrdering(orderBy, sortDir)
             .ApplyPaging(page, pageSize)
             .Select(i => new InvoiceReadDto(
                 i.Id,
