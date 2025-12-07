@@ -104,6 +104,8 @@ namespace Labotec.Api.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,2)");
 
+                    b.HasCheckConstraint("CK_InvoiceItems_Price_NonNegative", "Price >= 0");
+
                     b.HasKey("Id");
 
                     b.HasIndex("InvoiceId");

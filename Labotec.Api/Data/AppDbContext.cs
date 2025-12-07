@@ -113,6 +113,10 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(i => i.Price)
                 .HasColumnType("decimal(18,2)");
 
+            entity.HasCheckConstraint(
+                "CK_InvoiceItems_Price_NonNegative",
+                "Price >= 0");
+
             entity.HasOne(i => i.Invoice)
                 .WithMany(i => i.Items)
                 .HasForeignKey(i => i.InvoiceId);
