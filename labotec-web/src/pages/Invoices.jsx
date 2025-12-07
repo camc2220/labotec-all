@@ -46,7 +46,6 @@ export default function Invoices() {
   const [labTests, setLabTests] = useState([])
   const [labTestsLoading, setLabTestsLoading] = useState(false)
   const [labTestsError, setLabTestsError] = useState('')
-  const [loadingInvoiceNumber, setLoadingInvoiceNumber] = useState(false)
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [printPatientKey, setPrintPatientKey] = useState('')
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
@@ -92,33 +91,11 @@ export default function Invoices() {
     loadLabTests()
   }, [isPatient, user])
 
-  const buildNextInvoiceNumber = lastNumber => {
-    const match = /^FAC-(\d{4})-(\d{4})$/.exec(lastNumber ?? '')
-    if (match) {
-      const [, year, seq] = match
-      const nextSeq = String(Number(seq) + 1).padStart(4, '0')
-      return `FAC-${year}-${nextSeq}`
-    }
+  const generateInvoiceNumber = () => {
     const year = new Date().getFullYear()
-    return `FAC-${year}-0001`
-  }
-
-  const loadNextInvoiceNumber = async () => {
-    setLoadingInvoiceNumber(true)
-    try {
-      const res = await api.get('/api/invoices', {
-        params: { page: 1, pageSize: 1, sortBy: 'Number', sortDir: 'desc' },
-      })
-      const list = res.data.items ?? res.data.Items ?? []
-      const lastNumber = list[0]?.number ?? list[0]?.Number ?? ''
-      setFormData(prev => ({ ...prev, number: buildNextInvoiceNumber(lastNumber) }))
-    } catch (err) {
-      console.error(err)
-      setFormError('No pudimos obtener el último número de factura; usamos un consecutivo sugerido.')
-      setFormData(prev => ({ ...prev, number: buildNextInvoiceNumber() }))
-    } finally {
-      setLoadingInvoiceNumber(false)
-    }
+    const random = Math.floor(Math.random() * 1000000)
+    const paddedRandom = String(random).padStart(6, '0')
+    return `FAC-${year}-${paddedRandom}`
   }
 
   const openForm = async item => {
@@ -149,7 +126,7 @@ export default function Invoices() {
       setFormData({ patientId: '', number: '', issuedAt: '', paid: false, items: [] })
       setEditingItem(null)
       setShowForm(true)
-      await loadNextInvoiceNumber()
+      setFormData(prev => ({ ...prev, number: generateInvoiceNumber() }))
     }
   }
 
@@ -186,8 +163,8 @@ export default function Invoices() {
       console.error(err)
       const isConflict = err?.response?.status === 409
       if (!editingItem && isConflict) {
-        setFormError('El número de factura ya existe. Actualizamos el consecutivo y puedes intentar nuevamente.')
-        await loadNextInvoiceNumber()
+        setFormError('El número de factura ya existe. Generamos un número aleatorio y puedes intentar nuevamente.')
+        setFormData(prev => ({ ...prev, number: generateInvoiceNumber() }))
       } else {
         setFormError('No pudimos guardar la factura. Revisa los datos e intenta nuevamente.')
       }
@@ -410,13 +387,12 @@ export default function Invoices() {
               <input
                 value={formData.number}
                 readOnly={!editingItem}
-                disabled={loadingInvoiceNumber && !editingItem}
                 className="w-full rounded-lg border px-3 py-2 text-sm bg-gray-50"
                 required
               />
               {!editingItem && (
                 <p className="mt-1 text-xs text-gray-500">
-                  El número se asigna automáticamente según el último consecutivo registrado.
+                  El número se asigna automáticamente de forma aleatoria.
                 </p>
               )}
             </div>
