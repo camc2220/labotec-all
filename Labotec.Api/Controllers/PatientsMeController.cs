@@ -1,6 +1,7 @@
 using Labotec.Api.Common;
 using Labotec.Api.Data;
 using Labotec.Api.DTOs;
+using Labotec.Api.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
