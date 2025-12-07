@@ -189,7 +189,7 @@ public class PatientsMeController : ControllerBase
                 i.Amount,
                 i.IssuedAt,
                 i.Paid,
-                i.Items
+                (i.Items ?? Array.Empty<InvoiceItem>())
                     .Select(item => new InvoiceItemReadDto(
                         item.LabTestId,
                         item.LabTest != null ? item.LabTest.Code : string.Empty,
