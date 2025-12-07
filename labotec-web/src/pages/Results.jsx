@@ -34,17 +34,39 @@ export default function Results() {
   const [formError, setFormError] = useState('')
   const [formData, setFormData] = useState({
     patientId: '',
-    testName: '',
-    resultValue: '',
-    unit: '',
     releasedAt: '',
+    results: [
+      {
+        testId: '',
+        testName: '',
+        resultValue: '',
+        unit: '',
+      },
+    ],
   })
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [printPatientKey, setPrintPatientKey] = useState('')
   const [selectedResultIds, setSelectedResultIds] = useState([])
+  const [labTests, setLabTests] = useState([])
+  const [loadingTests, setLoadingTests] = useState(false)
 
   const isPatient = user?.role === 'patient'
   const endpoint = isPatient ? '/api/patients/me/results' : '/api/results'
+
+  const loadLabTests = async () => {
+    if (isPatient) return
+    setLoadingTests(true)
+    try {
+      const res = await api.get('/api/labtests', {
+        params: { page: 1, pageSize: 200, active: true, sortBy: 'Code' },
+      })
+      setLabTests(res.data.items ?? res.data.Items ?? [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingTests(false)
+    }
+  }
 
   const fetchData = async () => {
     if (!user) return
@@ -65,18 +87,45 @@ export default function Results() {
     if (user) fetchData()
   }, [endpoint, user])
 
+  useEffect(() => {
+    loadLabTests()
+  }, [])
+
+  const findLabTestMatch = testName => {
+    if (!testName) return null
+    const normalized = testName.trim().toLowerCase()
+    return labTests.find(test => (test.name ?? test.Name ?? '').trim().toLowerCase() === normalized) ?? null
+  }
+
   const openForm = item => {
     if (item) {
+      const matchedTest = findLabTestMatch(item.testName)
       setFormData({
         patientId: item.patientId ?? '',
-        testName: item.testName ?? '',
-        resultValue: item.resultValue ?? '',
-        unit: item.unit ?? '',
         releasedAt: item.releasedAt ? item.releasedAt.slice(0, 16) : '',
+        results: [
+          {
+            testId: resolveEntityId(matchedTest) ?? '',
+            testName: item.testName ?? '',
+            resultValue: item.resultValue ?? '',
+            unit: item.unit ?? '',
+          },
+        ],
       })
       setEditingItem(item)
     } else {
-      setFormData({ patientId: '', testName: '', resultValue: '', unit: '', releasedAt: '' })
+      setFormData({
+        patientId: '',
+        releasedAt: '',
+        results: [
+          {
+            testId: '',
+            testName: '',
+            resultValue: '',
+            unit: '',
+          },
+        ],
+      })
       setEditingItem(null)
     }
     setFormError('')
@@ -92,14 +141,38 @@ export default function Results() {
   const handleFormSubmit = async e => {
     e.preventDefault()
     if (isPatient) return
+    if (!formData.patientId || !formData.releasedAt) {
+      setFormError('Debes seleccionar un paciente y la fecha de liberación.')
+      return
+    }
+
+    const hasInvalidResult = formData.results.some(result => {
+      const name = (result.testName ?? '').trim()
+      const value = (result.resultValue ?? '').trim()
+      return !name || !value
+    })
+    if (hasInvalidResult) {
+      setFormError('Completa el nombre de la prueba y el resultado para cada fila.')
+      return
+    }
+
     setSaving(true)
     setFormError('')
     try {
-      const payload = { ...formData }
+      const buildPayload = result => ({
+        patientId: formData.patientId,
+        testName: (result.testName ?? '').trim(),
+        resultValue: (result.resultValue ?? '').trim(),
+        unit: (result.unit ?? '').trim(),
+        releasedAt: formData.releasedAt,
+      })
+
       if (editingItem) {
-        await api.put(`/api/results/${resolveEntityId(editingItem)}`, payload)
+        const firstResult = formData.results[0]
+        await api.put(`/api/results/${resolveEntityId(editingItem)}`, buildPayload(firstResult))
       } else {
-        await api.post('/api/results', payload)
+        const payloads = formData.results.map(result => buildPayload(result))
+        await Promise.all(payloads.map(payload => api.post('/api/results', payload)))
       }
       closeForm()
       fetchData()
@@ -229,6 +302,47 @@ export default function Results() {
   ]
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
+  const handleAddResultRow = () => {
+    setFormData(prev => ({
+      ...prev,
+      results: [
+        ...prev.results,
+        {
+          testId: '',
+          testName: '',
+          resultValue: '',
+          unit: '',
+        },
+      ],
+    }))
+  }
+
+  const handleRemoveResultRow = index => {
+    setFormData(prev => ({
+      ...prev,
+      results: prev.results.filter((_, idx) => idx !== index),
+    }))
+  }
+
+  const handleResultChange = (index, updates) => {
+    setFormData(prev => ({
+      ...prev,
+      results: prev.results.map((item, idx) => (idx === index ? { ...item, ...updates } : item)),
+    }))
+  }
+
+  const testOptions = useMemo(
+    () =>
+      labTests
+        .map(test => ({
+          id: resolveEntityId(test) ?? test.code ?? test.Code ?? test.name ?? test.Name,
+          name: test.name ?? test.Name ?? 'Sin nombre',
+          unit: test.defaultUnit ?? test.DefaultUnit ?? '',
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [labTests]
+  )
+
   return (
     <section className="space-y-4">
       <div className={`rounded-2xl px-6 py-5 text-white shadow-md ${isPatient ? 'bg-gradient-to-r from-emerald-500 to-sky-500' : 'bg-gradient-to-r from-sky-600 to-sky-500'}`}>
@@ -279,34 +393,6 @@ export default function Results() {
               label="Paciente"
             />
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Prueba</label>
-              <input
-                value={formData.testName}
-                onChange={e => setFormData({ ...formData, testName: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Resultado</label>
-                <input
-                  value={formData.resultValue}
-                  onChange={e => setFormData({ ...formData, resultValue: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Unidad</label>
-                <input
-                  value={formData.unit}
-                  onChange={e => setFormData({ ...formData, unit: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-            <div>
               <label className="block text-xs text-gray-600 mb-1">Fecha de liberación</label>
               <input
                 type="datetime-local"
@@ -315,6 +401,89 @@ export default function Results() {
                 className="w-full rounded-lg border px-3 py-2 text-sm"
                 required
               />
+            </div>
+            <div className="space-y-4">
+              {formData.results.map((result, index) => (
+                <div key={index} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Resultado #{index + 1}</p>
+                      <p className="text-xs text-gray-500">Selecciona una prueba existente o escribe su nombre.</p>
+                    </div>
+                    {formData.results.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveResultRow(index)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Prueba guardada</label>
+                      <select
+                        value={result.testId}
+                        onChange={e => {
+                          const selected = testOptions.find(option => option.id === e.target.value)
+                          handleResultChange(index, {
+                            testId: e.target.value,
+                            testName: selected?.name ?? result.testName,
+                            unit: selected?.unit ?? result.unit,
+                          })
+                        }}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        disabled={loadingTests}
+                      >
+                        <option value="">Selecciona una prueba</option>
+                        {testOptions.map(option => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      {loadingTests && <p className="text-xs text-gray-500">Cargando pruebas...</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Nombre de la prueba</label>
+                      <input
+                        value={result.testName}
+                        onChange={e => handleResultChange(index, { testName: e.target.value })}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Resultado</label>
+                      <input
+                        value={result.resultValue}
+                        onChange={e => handleResultChange(index, { resultValue: e.target.value })}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Unidad</label>
+                      <input
+                        value={result.unit}
+                        onChange={e => handleResultChange(index, { unit: e.target.value })}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        placeholder="mg/dL, g/dL, etc."
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={handleAddResultRow}
+                className="w-full rounded-lg border border-dashed border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+              >
+                Agregar otra prueba
+              </button>
             </div>
             {formError && <div className="text-sm text-red-600">{formError}</div>}
             <div className="flex justify-end gap-2">
