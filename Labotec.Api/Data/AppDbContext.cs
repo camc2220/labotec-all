@@ -129,10 +129,11 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(i => i.Price)
                 .HasColumnType("decimal(18,2)");
 
+            entity.HasCharSet("utf8mb4");
+            entity.UseCollation("ascii_general_ci");
+
             entity.ToTable("InvoiceItems", tableBuilder =>
             {
-                tableBuilder.HasCharSet("utf8mb4");
-                tableBuilder.UseCollation("ascii_general_ci");
                 tableBuilder.HasCheckConstraint("CK_InvoiceItems_Price_NonNegative", "Price >= 0");
             });
 
