@@ -6,7 +6,6 @@ bin/
 obj/
 **/bin/
 **/obj/
-# Explicit solution folders
 /Labotec.Api/bin/
 /Labotec.Api/obj/
 artifacts/
