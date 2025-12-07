@@ -180,14 +180,21 @@ public class InvoicesController : ControllerBase
         return File(bytes, "text/csv", fileName);
     }
 
-    private async Task<(IReadOnlyCollection<InvoiceItem>, decimal?)> BuildItems(IEnumerable<InvoiceItemCreateDto> itemsDto)
+    private async Task<(IReadOnlyCollection<InvoiceItem>, decimal?)> BuildItems(
+        IEnumerable<InvoiceItemCreateDto> itemsDto,
+        bool allowInactive = false)
     {
         var result = new List<InvoiceItem>();
         var labTestIds = itemsDto.Select(i => i.LabTestId).Distinct().ToList();
 
-        var tests = await _db.LabTests
-            .Where(t => labTestIds.Contains(t.Id) && t.Active)
-            .ToListAsync();
+        var testsQuery = _db.LabTests.Where(t => labTestIds.Contains(t.Id));
+
+        if (!allowInactive)
+        {
+            testsQuery = testsQuery.Where(t => t.Active);
+        }
+
+        var tests = await testsQuery.ToListAsync();
 
         if (tests.Count != labTestIds.Count)
         {
@@ -267,7 +274,7 @@ public class InvoicesController : ControllerBase
 
         if (dto.Items is null || !dto.Items.Any()) return BadRequest("Debe seleccionar al menos una prueba.");
 
-        var (items, total) = await BuildItems(dto.Items);
+        var (items, total) = await BuildItems(dto.Items, allowInactive: true);
         if (!items.Any()) return BadRequest("Alguna prueba no existe o no tiene precio configurado.");
         if (!total.HasValue) return BadRequest("Alguna prueba no existe o no tiene precio configurado.");
 
