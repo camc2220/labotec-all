@@ -307,6 +307,11 @@ public class InvoicesController : ControllerBase
 
         _db.InvoiceItems.RemoveRange(i.Items);
 
+        foreach (var item in items)
+        {
+            item.InvoiceId = i.Id;
+        }
+
         i.Number = dto.Number;
         i.Amount = total.Value;
         i.IssuedAt = issuedAt;
