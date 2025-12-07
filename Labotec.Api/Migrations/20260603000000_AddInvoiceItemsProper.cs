@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Labotec.Api.Migrations
 {
     /// <inheritdoc />
-    public partial class AddInvoiceItems : Migration
+    public partial class AddInvoiceItemsProper : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -45,6 +45,11 @@ namespace Labotec.Api.Migrations
                 name: "IX_InvoiceItems_LabTestId",
                 table: "InvoiceItems",
                 column: "LabTestId");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "CK_InvoiceItems_Price_NonNegative",
+                table: "InvoiceItems",
+                sql: "Price >= 0");
         }
 
         /// <inheritdoc />
