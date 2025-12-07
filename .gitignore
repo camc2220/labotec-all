@@ -6,6 +6,8 @@ bin/
 obj/
 **/bin/
 **/obj/
+/Labotec.Api/bin/
+/Labotec.Api/obj/
 artifacts/
 *.user
 *.suo
