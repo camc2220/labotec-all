@@ -79,11 +79,11 @@ public class InvoicesController : ControllerBase
         if (to.HasValue) q = q.Where(i => i.IssuedAt <= to.Value);
 
         var total = await q.CountAsync();
-        var data = await q
+        var data = (await q
             .ApplyOrdering(sortBy, sortDir)
             .ApplyPaging(page, pageSize)
-            .Select(i => ToReadDto(i))
-            .ToListAsync();
+            .ToListAsync())
+            .Select(i => ToReadDto(i));
 
         return Ok(new PagedResult<InvoiceReadDto>(data, page, pageSize, total));
     }
