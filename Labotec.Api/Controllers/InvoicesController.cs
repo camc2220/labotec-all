@@ -101,13 +101,11 @@ public class InvoicesController : ControllerBase
         if (to.HasValue) q = q.Where(i => i.IssuedAt <= to.Value);
 
         var total = await q.CountAsync();
-        var orderBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Invoice.IssuedAt) : sortBy;
 
-        var data = (await q
-            .ApplyOrdering(orderBy, sortDir)
-            .ApplyPaging(page, pageSize)
-            .ToListAsync())
-            .Select(i => ToReadDto(i));
+        var data = (await q.ApplyInvoiceOrdering(sortBy, sortDir)
+                .ApplyPaging(page, pageSize)
+                .ToListAsync())
+            .Select(ToReadDto);
 
         return Ok(new PagedResult<InvoiceReadDto>(data, page, pageSize, total));
     }
@@ -162,10 +160,7 @@ public class InvoicesController : ControllerBase
         if (from.HasValue) q = q.Where(i => i.IssuedAt >= from.Value);
         if (to.HasValue) q = q.Where(i => i.IssuedAt <= to.Value);
 
-        var orderBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Invoice.IssuedAt) : sortBy;
-
-        var data = await q
-            .ApplyOrdering(orderBy, sortDir)
+        var data = await q.ApplyInvoiceOrdering(sortBy, sortDir)
             .Select(i => new
             {
                 i.Id,
@@ -333,4 +328,5 @@ public class InvoicesController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
 }
