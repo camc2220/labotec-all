@@ -187,11 +187,13 @@ public class PatientsMeController : ControllerBase
                 i.Amount,
                 i.IssuedAt,
                 i.Paid,
-                i.Items.Select(item => new InvoiceItemReadDto(
-                    item.LabTestId,
-                    item.LabTest.Code,
-                    item.LabTest.Name,
-                    item.Price)))
+                i.Items
+                    .Select(item => new InvoiceItemReadDto(
+                        item.LabTestId,
+                        item.LabTest.Code,
+                        item.LabTest.Name,
+                        item.Price))
+                    .ToList()))
             .ToListAsync();
 
         return Ok(new PagedResult<InvoiceReadDto>(data, page, pageSize, total));
