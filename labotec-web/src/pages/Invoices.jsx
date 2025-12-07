@@ -123,10 +123,16 @@ export default function Invoices() {
         setFormError('No pudimos cargar el detalle de la factura para editarla.')
       }
     } else {
-      setFormData({ patientId: '', number: '', issuedAt: '', paid: false, items: [] })
+      const today = new Date().toISOString().slice(0, 10)
+      setFormData({
+        patientId: '',
+        number: generateInvoiceNumber(),
+        issuedAt: today,
+        paid: false,
+        items: [],
+      })
       setEditingItem(null)
       setShowForm(true)
-      setFormData(prev => ({ ...prev, number: generateInvoiceNumber() }))
     }
   }
 
@@ -149,6 +155,7 @@ export default function Invoices() {
     try {
       const payload = {
         ...formData,
+        issuedAt: formData.issuedAt ? `${formData.issuedAt}T00:00:00Z` : null,
         paid: Boolean(formData.paid),
         items: (formData.items ?? []).map(it => ({ labTestId: it.labTestId, price: it.price })),
       }
