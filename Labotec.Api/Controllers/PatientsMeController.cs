@@ -178,9 +178,10 @@ public class PatientsMeController : ControllerBase
 
         var total = await query.CountAsync();
 
-        var data = await query
-            .ApplyInvoiceOrdering(sortBy, sortDir)
-            .ApplyPaging(page, pageSize)
+        var data = (await query
+                .ApplyInvoiceOrdering(sortBy, sortDir)
+                .ApplyPaging(page, pageSize)
+                .ToListAsync())
             .Select(i => new InvoiceReadDto(
                 i.Id,
                 i.PatientId,
@@ -194,9 +195,7 @@ public class PatientsMeController : ControllerBase
                         item.LabTestId,
                         item.LabTest != null ? item.LabTest.Code : string.Empty,
                         item.LabTest != null ? item.LabTest.Name : string.Empty,
-                        item.Price))
-                    .ToList()))
-            .ToListAsync();
+                        item.Price))));
 
         return Ok(new PagedResult<InvoiceReadDto>(data, page, pageSize, total));
     }
