@@ -22,6 +22,7 @@ export default function Layout() {
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
         { to: '/app/results', label: 'Resultados' },
+        { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
@@ -37,6 +38,7 @@ export default function Layout() {
 
     if (user.isFacturacion) {
       return [
+        { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]

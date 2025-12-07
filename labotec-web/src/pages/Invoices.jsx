@@ -23,6 +23,10 @@ const formatDate = value => {
   }
 }
 
+const getLabTestId = test => test?.id ?? test?.Id ?? ''
+const getLabTestPrice = test => Number(test?.defaultPrice ?? test?.DefaultPrice ?? 0)
+const formatMoney = value => Number(value ?? 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 export default function Invoices() {
   const { user } = useAuth()
   const [items, setItems] = useState([])
@@ -35,10 +39,13 @@ export default function Invoices() {
   const [formData, setFormData] = useState({
     patientId: '',
     number: '',
-    amount: '',
     issuedAt: '',
     paid: false,
+    items: [],
   })
+  const [labTests, setLabTests] = useState([])
+  const [labTestsLoading, setLabTestsLoading] = useState(false)
+  const [labTestsError, setLabTestsError] = useState('')
   const [loadingInvoiceNumber, setLoadingInvoiceNumber] = useState(false)
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [printPatientKey, setPrintPatientKey] = useState('')
@@ -65,6 +72,25 @@ export default function Invoices() {
   useEffect(() => {
     if (user) fetchData()
   }, [endpoint, user])
+
+  useEffect(() => {
+    const loadLabTests = async () => {
+      if (!user || isPatient) return
+      setLabTestsLoading(true)
+      setLabTestsError('')
+      try {
+        const res = await api.get('/api/labtests', { params: { page: 1, pageSize: 200, active: true, sortBy: 'Code' } })
+        const list = res.data.items ?? res.data.Items ?? []
+        setLabTests(list)
+      } catch (err) {
+        console.error(err)
+        setLabTestsError('No pudimos cargar las pruebas disponibles.')
+      } finally {
+        setLabTestsLoading(false)
+      }
+    }
+    loadLabTests()
+  }, [isPatient, user])
 
   const buildNextInvoiceNumber = lastNumber => {
     const match = /^FAC-(\d{4})-(\d{4})$/.exec(lastNumber ?? '')
@@ -98,17 +124,29 @@ export default function Invoices() {
   const openForm = async item => {
     setFormError('')
     if (item) {
-      setFormData({
-        patientId: item.patientId ?? '',
-        number: item.number ?? '',
-        amount: item.amount ?? '',
-        issuedAt: item.issuedAt ? item.issuedAt.slice(0, 10) : '',
-        paid: Boolean(item.paid),
-      })
-      setEditingItem(item)
-      setShowForm(true)
+      try {
+        const id = resolveEntityId(item)
+        const res = await api.get(`/api/invoices/${id}`)
+        const invoice = res.data ?? {}
+        setFormData({
+          patientId: invoice.patientId ?? '',
+          number: invoice.number ?? '',
+          issuedAt: invoice.issuedAt ? invoice.issuedAt.slice(0, 10) : '',
+          paid: Boolean(invoice.paid),
+          items: (invoice.items ?? []).map(it => ({
+            labTestId: it.labTestId,
+            price: it.price,
+            name: it.name ?? it.Name ?? it.code ?? it.Code ?? '',
+          })),
+        })
+        setEditingItem(item)
+        setShowForm(true)
+      } catch (err) {
+        console.error(err)
+        setFormError('No pudimos cargar el detalle de la factura para editarla.')
+      }
     } else {
-      setFormData({ patientId: '', number: '', amount: '', issuedAt: '', paid: false })
+      setFormData({ patientId: '', number: '', issuedAt: '', paid: false, items: [] })
       setEditingItem(null)
       setShowForm(true)
       await loadNextInvoiceNumber()
@@ -126,8 +164,17 @@ export default function Invoices() {
     if (isPatient) return
     setSaving(true)
     setFormError('')
+    if (!formData.items || formData.items.length === 0) {
+      setFormError('Selecciona al menos una prueba para facturar.')
+      setSaving(false)
+      return
+    }
     try {
-      const payload = { ...formData, paid: Boolean(formData.paid) }
+      const payload = {
+        ...formData,
+        paid: Boolean(formData.paid),
+        items: (formData.items ?? []).map(it => ({ labTestId: it.labTestId, price: it.price })),
+      }
       if (editingItem) {
         await api.put(`/api/invoices/${resolveEntityId(editingItem)}`, payload)
       } else {
@@ -197,6 +244,26 @@ export default function Invoices() {
     return items.filter(row => getPatientKey(row) === printPatientKey && selectedSet.has(getInvoiceKey(row)))
   }, [items, printPatientKey, selectedInvoiceIds])
 
+  const selectedLabTestIds = useMemo(
+    () => new Set((formData.items ?? []).map(item => item.labTestId)),
+    [formData.items]
+  )
+
+  const selectedLabTests = useMemo(() => {
+    if (labTests.length === 0 || selectedLabTestIds.size === 0) return []
+    return labTests.filter(test => selectedLabTestIds.has(getLabTestId(test)))
+  }, [labTests, selectedLabTestIds])
+
+  const totalAmount = useMemo(
+    () => (formData.items ?? []).reduce((sum, item) => sum + Number(item.price ?? 0), 0),
+    [formData.items]
+  )
+
+  const inactiveSelectedItems = useMemo(
+    () => (formData.items ?? []).filter(item => !labTests.some(test => getLabTestId(test) === item.labTestId)),
+    [formData.items, labTests]
+  )
+
   const toggleInvoiceSelection = id => {
     setSelectedInvoiceIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]))
   }
@@ -244,9 +311,31 @@ export default function Invoices() {
     closePrintModal()
   }
 
+  const toggleLabTestSelection = labTestId => {
+    setFormData(prev => {
+      const items = prev.items ?? []
+      const exists = items.find(it => it.labTestId === labTestId)
+      if (exists) {
+        return { ...prev, items: items.filter(it => it.labTestId !== labTestId) }
+      }
+      const test = labTests.find(t => getLabTestId(t) === labTestId)
+      const price = test ? getLabTestPrice(test) : 0
+      const name = test ? `${test.code ?? test.Code ?? ''} ${test.name ?? test.Name ?? ''}`.trim() : ''
+      return { ...prev, items: [...items, { labTestId, price, name }] }
+    })
+  }
+
   const columns = [
     ...(isPatient ? [] : [{ key: 'patientName', header: 'Paciente' }]),
     { key: 'number', header: 'Factura' },
+    {
+      key: 'items',
+      header: 'Pruebas',
+      render: row => (row.items ?? row.Items ?? [])
+        .map(item => item.name ?? item.Name ?? item.code ?? item.Code ?? '')
+        .filter(Boolean)
+        .join(', '),
+    },
     { key: 'amount', header: 'Monto' },
     { key: 'issuedAt', header: 'Fecha' },
     { key: 'paid', header: 'Pagada', render: r => r.paid ? 'Sí' : 'No' },
@@ -331,18 +420,49 @@ export default function Invoices() {
                 </p>
               )}
             </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Pruebas facturadas</label>
+              {labTestsError && (
+                <div className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{labTestsError}</div>
+              )}
+              {labTestsLoading ? (
+                <div className="text-sm text-gray-600">Cargando pruebas...</div>
+              ) : (
+                <div className="max-h-60 space-y-2 overflow-y-auto rounded-lg border p-3">
+                  {labTests.length === 0 && inactiveSelectedItems.length === 0 ? (
+                    <div className="text-sm text-gray-500">No hay pruebas configuradas.</div>
+                  ) : (
+                    labTests.map(test => {
+                      const id = getLabTestId(test)
+                      const checked = selectedLabTestIds.has(id)
+                      const selected = (formData.items ?? []).find(it => it.labTestId === id)
+                      const price = selected?.price ?? getLabTestPrice(test)
+                      return (
+                        <label key={id} className="flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLabTestSelection(id)}
+                            className="mt-1"
+                          />
+                          <span>
+                            <span className="font-medium">{test.code ?? test.Code} - {test.name ?? test.Name}</span>
+                            <span className="block text-xs text-gray-500">Precio: RD$ {formatMoney(price)}</span>
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                  {inactiveSelectedItems.length > 0 && (
+                    <div className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                      Incluye {inactiveSelectedItems.length} prueba(s) ya inactivas que se mantienen para esta factura.
+                    </div>
+                  )}
+                </div>
+              )}
+              <p className="mt-1 text-xs text-gray-500">Selecciona una o varias pruebas para calcular el monto automáticamente.</p>
+            </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="block text-xs text-gray-600 mb-1">Monto</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
-                  required
-                />
-              </div>
               <div>
                 <label className="block text-xs text-gray-600 mb-1">Fecha de emisión</label>
                 <input
@@ -352,6 +472,12 @@ export default function Invoices() {
                   className="w-full rounded-lg border px-3 py-2 text-sm"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Total calculado</label>
+                <div className="w-full rounded-lg border bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800">
+                  RD$ {formatMoney(totalAmount)}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -366,7 +492,11 @@ export default function Invoices() {
             {formError && <div className="text-sm text-red-600">{formError}</div>}
             <div className="flex justify-end gap-2">
               <button type="button" onClick={closeForm} className="rounded-lg border px-3 py-2 text-sm">Cancelar</button>
-              <button type="submit" className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white" disabled={saving}>
+              <button
+                type="submit"
+                className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white"
+                disabled={saving || !formData.items || formData.items.length === 0}
+              >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
             </div>

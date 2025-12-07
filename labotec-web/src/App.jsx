@@ -8,6 +8,7 @@ import Patients from './pages/Patients'
 import Appointments from './pages/Appointments'
 import Results from './pages/Results'
 import Invoices from './pages/Invoices'
+import LabTests from './pages/LabTests'
 import Home from './pages/Home'
 import PatientDashboard from './pages/PatientDashboard'
 import AppIndexRedirect from './components/AppIndexRedirect'
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="patients" element={<Patients />} />
           <Route path="appointments" element={<Appointments />} />
           <Route path="results" element={<Results />} />
+          <Route path="lab-tests" element={<LabTests />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="profile" element={<Profile />} />
         </Route>

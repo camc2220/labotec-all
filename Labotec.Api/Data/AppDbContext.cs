@@ -14,6 +14,7 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<LabResult> LabResults => Set<LabResult>();
     public DbSet<LabOrder> LabOrders => Set<LabOrder>();
     public DbSet<LabOrderItem> LabOrderItems => Set<LabOrderItem>();
@@ -105,6 +106,20 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
                 .HasMaxLength(40);
 
             entity.HasIndex(t => t.Code).IsUnique();
+        });
+
+        builder.Entity<InvoiceItem>(entity =>
+        {
+            entity.Property(i => i.Price)
+                .HasColumnType("decimal(18,2)");
+
+            entity.HasOne(i => i.Invoice)
+                .WithMany(i => i.Items)
+                .HasForeignKey(i => i.InvoiceId);
+
+            entity.HasOne(i => i.LabTest)
+                .WithMany()
+                .HasForeignKey(i => i.LabTestId);
         });
     }
 }

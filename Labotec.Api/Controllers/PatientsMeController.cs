@@ -167,6 +167,8 @@ public class PatientsMeController : ControllerBase
         var query = _db.Invoices
             .AsNoTracking()
             .Include(i => i.Patient)
+            .Include(i => i.Items)
+            .ThenInclude(ii => ii.LabTest)
             .Where(i => i.PatientId == patientId.Value);
 
         if (paid.HasValue) query = query.Where(i => i.Paid == paid.Value);
@@ -184,7 +186,12 @@ public class PatientsMeController : ControllerBase
                 i.Number,
                 i.Amount,
                 i.IssuedAt,
-                i.Paid))
+                i.Paid,
+                i.Items.Select(item => new InvoiceItemReadDto(
+                    item.LabTestId,
+                    item.LabTest.Code,
+                    item.LabTest.Name,
+                    item.Price)))
             .ToListAsync();
 
         return Ok(new PagedResult<InvoiceReadDto>(data, page, pageSize, total));

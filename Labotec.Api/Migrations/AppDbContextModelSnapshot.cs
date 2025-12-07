@@ -89,6 +89,30 @@ namespace Labotec.Api.Migrations
                     b.ToTable("Invoices");
                 });
 
+            modelBuilder.Entity("Labotec.Api.Domain.InvoiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<Guid>("LabTestId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("LabTestId");
+
+                    b.ToTable("InvoiceItems");
+                });
+
             modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
                 {
                     b.Property<Guid>("Id")
@@ -476,6 +500,25 @@ namespace Labotec.Api.Migrations
                     b.Navigation("Patient");
                 });
 
+            modelBuilder.Entity("Labotec.Api.Domain.InvoiceItem", b =>
+                {
+                    b.HasOne("Labotec.Api.Domain.Invoice", "Invoice")
+                        .WithMany("Items")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Labotec.Api.Domain.LabTest", "LabTest")
+                        .WithMany()
+                        .HasForeignKey("LabTestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("LabTest");
+                });
+
             modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
                 {
                     b.HasOne("Labotec.Api.Domain.Patient", "Patient")
@@ -569,6 +612,11 @@ namespace Labotec.Api.Migrations
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.Invoice", b =>
                 {
                     b.Navigation("Items");
                 });
