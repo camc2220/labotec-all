@@ -81,7 +81,7 @@ export default function Invoices() {
     setLoadingInvoiceNumber(true)
     try {
       const res = await api.get('/api/invoices', {
-        params: { page: 1, pageSize: 1, sortBy: 'IssuedAt', sortDir: 'desc' },
+        params: { page: 1, pageSize: 1, sortBy: 'Number', sortDir: 'desc' },
       })
       const list = res.data.items ?? res.data.Items ?? []
       const lastNumber = list[0]?.number ?? list[0]?.Number ?? ''
@@ -137,7 +137,13 @@ export default function Invoices() {
       fetchData()
     } catch (err) {
       console.error(err)
-      setFormError('No pudimos guardar la factura. Revisa los datos e intenta nuevamente.')
+      const isConflict = err?.response?.status === 409
+      if (!editingItem && isConflict) {
+        setFormError('El número de factura ya existe. Actualizamos el consecutivo y puedes intentar nuevamente.')
+        await loadNextInvoiceNumber()
+      } else {
+        setFormError('No pudimos guardar la factura. Revisa los datos e intenta nuevamente.')
+      }
     } finally {
       setSaving(false)
     }
