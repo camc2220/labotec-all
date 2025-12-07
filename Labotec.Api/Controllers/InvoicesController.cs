@@ -140,8 +140,10 @@ public class InvoicesController : ControllerBase
         if (from.HasValue) q = q.Where(i => i.IssuedAt >= from.Value);
         if (to.HasValue) q = q.Where(i => i.IssuedAt <= to.Value);
 
+        var orderBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Invoice.IssuedAt) : sortBy;
+
         var data = await q
-            .ApplyOrdering(sortBy, sortDir)
+            .ApplyOrdering(orderBy, sortDir)
             .Select(i => new
             {
                 i.Id,
