@@ -51,6 +51,7 @@ export default function Invoices() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
 
   const isPatient = user?.role === 'patient'
+  const canManage = user?.isAdmin || user?.isFacturacion
   const endpoint = isPatient ? '/api/patients/me/invoices' : '/api/invoices'
 
   const fetchData = async () => {
@@ -99,6 +100,7 @@ export default function Invoices() {
   }
 
   const openForm = async item => {
+    if (!canManage) return
     setFormError('')
     if (item) {
       try {
@@ -144,7 +146,7 @@ export default function Invoices() {
 
   const handleFormSubmit = async e => {
     e.preventDefault()
-    if (isPatient) return
+    if (isPatient || !canManage) return
     setSaving(true)
     setFormError('')
     if (!formData.items || formData.items.length === 0) {
@@ -181,7 +183,7 @@ export default function Invoices() {
   }
 
   const handleDelete = async item => {
-    if (isPatient) return
+    if (isPatient || !canManage) return
     const id = resolveEntityId(item)
     if (!id) return
     if (!window.confirm('¿Eliminar esta factura?')) return
@@ -323,7 +325,7 @@ export default function Invoices() {
     { key: 'amount', header: 'Monto' },
     { key: 'issuedAt', header: 'Fecha' },
     { key: 'paid', header: 'Pagada', render: r => r.paid ? 'Sí' : 'No' },
-    ...(!isPatient
+    ...(!isPatient && canManage
       ? [
         {
           key: 'actions',
@@ -363,7 +365,7 @@ export default function Invoices() {
             >
               Imprimir
             </button>
-            {!isPatient && (
+            {canManage && (
               <button onClick={() => openForm(null)} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Agregar factura</button>
             )}
           </div>
