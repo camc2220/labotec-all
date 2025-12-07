@@ -182,7 +182,7 @@ public class PatientsMeController : ControllerBase
             .Select(i => new InvoiceReadDto(
                 i.Id,
                 i.PatientId,
-                i.Patient.FullName,
+                i.Patient?.FullName ?? string.Empty,
                 i.Number,
                 i.Amount,
                 i.IssuedAt,
@@ -190,8 +190,8 @@ public class PatientsMeController : ControllerBase
                 i.Items
                     .Select(item => new InvoiceItemReadDto(
                         item.LabTestId,
-                        item.LabTest.Code,
-                        item.LabTest.Name,
+                        item.LabTest?.Code ?? string.Empty,
+                        item.LabTest?.Name ?? string.Empty,
                         item.Price))
                     .ToList()))
             .ToListAsync();

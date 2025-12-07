@@ -21,20 +21,25 @@ public class InvoicesController : ControllerBase
     private bool IsStaff() =>
         User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Facturacion");
 
-    private static InvoiceReadDto ToReadDto(Invoice i) => new(
-        i.Id,
-        i.PatientId,
-        i.Patient.FullName,
-        i.Number,
-        i.Amount,
-        i.IssuedAt,
-        i.Paid,
-        i.Items.Select(item => new InvoiceItemReadDto(
-            item.LabTestId,
-            item.LabTest.Code,
-            item.LabTest.Name,
-            item.Price
-        )));
+    private static InvoiceReadDto ToReadDto(Invoice i)
+    {
+        var items = i.Items ?? Array.Empty<InvoiceItem>();
+
+        return new InvoiceReadDto(
+            i.Id,
+            i.PatientId,
+            i.Patient?.FullName ?? string.Empty,
+            i.Number,
+            i.Amount,
+            i.IssuedAt,
+            i.Paid,
+            items.Select(item => new InvoiceItemReadDto(
+                item.LabTestId,
+                item.LabTest?.Code ?? string.Empty,
+                item.LabTest?.Name ?? string.Empty,
+                item.Price
+            )));
+    }
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<InvoiceReadDto>>> Get(
@@ -139,7 +144,7 @@ public class InvoicesController : ControllerBase
             {
                 i.Id,
                 i.PatientId,
-                PatientName = i.Patient.FullName,
+                PatientName = i.Patient != null ? i.Patient.FullName : string.Empty,
                 i.Number,
                 i.Amount,
                 i.IssuedAt,
