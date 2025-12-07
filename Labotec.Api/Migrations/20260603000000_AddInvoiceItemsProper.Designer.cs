@@ -95,13 +95,16 @@ namespace Labotec.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
+                        .HasColumnType("char(36)")
+                        .UseCollation("ascii_general_ci");
 
                     b.Property<Guid>("InvoiceId")
-                        .HasColumnType("char(36)");
+                        .HasColumnType("char(36)")
+                        .UseCollation("ascii_general_ci");
 
                     b.Property<Guid>("LabTestId")
-                        .HasColumnType("char(36)");
+                        .HasColumnType("char(36)")
+                        .UseCollation("ascii_general_ci");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("decimal(18,2)");
@@ -114,7 +117,9 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("LabTestId");
 
-                    b.ToTable("InvoiceItems");
+                    b.ToTable("InvoiceItems", (string)null);
+                    b.UseCollation("ascii_general_ci");
+                    MySqlEntityTypeBuilderExtensions.HasCharSet(b, "utf8mb4");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>

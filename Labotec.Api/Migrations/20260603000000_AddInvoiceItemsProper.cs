@@ -14,9 +14,9 @@ namespace Labotec.Api.Migrations
                 name: "InvoiceItems",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "char(36)", nullable: false),
-                    InvoiceId = table.Column<Guid>(type: "char(36)", nullable: false),
-                    LabTestId = table.Column<Guid>(type: "char(36)", nullable: false),
+                    Id = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
+                    InvoiceId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
+                    LabTestId = table.Column<Guid>(type: "char(36)", nullable: false, collation: "ascii_general_ci"),
                     Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
                 },
                 constraints: table =>
@@ -34,7 +34,8 @@ namespace Labotec.Api.Migrations
                         principalTable: "LabTests",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                });
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
                 name: "IX_InvoiceItems_InvoiceId",
