@@ -13,7 +13,11 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+<<<<<<< Updated upstream
 [assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+23000a91ce47db9ee936c77a32bbe701ae87acb0")]
+=======
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+304c0e33adb984e2a6b76808a5b81f2ce67a4705")]
+>>>>>>> Stashed changes
 [assembly: System.Reflection.AssemblyProductAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Labotec.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

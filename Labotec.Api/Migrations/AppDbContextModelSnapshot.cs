@@ -613,12 +613,12 @@ namespace Labotec.Api.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
+            modelBuilder.Entity("Labotec.Api.Domain.Invoice", b =>
                 {
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("Labotec.Api.Domain.Invoice", b =>
+            modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
                 {
                     b.Navigation("Items");
                 });
