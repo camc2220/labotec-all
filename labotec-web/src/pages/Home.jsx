@@ -73,9 +73,9 @@ export default function Home() {
       setTestsLoading(true)
       setTestsError('')
       try {
-        const response = await api.get('/api/labtests', { params: { page: 1, pageSize: 50, sortBy: 'Name' } })
-        const items = response.data.items ?? response.data.Items ?? []
-        const filtered = items.filter((item) => Boolean(item.active ?? item.Active))
+        const response = await api.get('/api/labtests/public')
+        const items = response.data.items ?? response.data.Items ?? response.data ?? []
+        const filtered = items.filter((item) => Boolean(item.active ?? item.Active ?? true))
         setActiveTests(filtered)
         setVisibleStart(0)
       } catch (error) {

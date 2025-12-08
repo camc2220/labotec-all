@@ -16,6 +16,25 @@ public class LabTestsController : ControllerBase
     private readonly AppDbContext _db;
     public LabTestsController(AppDbContext db) => _db = db;
 
+    [HttpGet("public")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IEnumerable<LabTestPublicDto>>> GetPublic()
+    {
+        var data = await _db.LabTests
+            .AsNoTracking()
+            .Where(t => t.Active)
+            .OrderBy(t => t.Name)
+            .Take(50)
+            .Select(t => new LabTestPublicDto(
+                t.Id,
+                t.Code,
+                t.Name,
+                t.DefaultUnit))
+            .ToListAsync();
+
+        return Ok(data);
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<LabTestReadDto>>> Get(
         [FromQuery] string? q,

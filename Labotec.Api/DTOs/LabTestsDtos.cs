@@ -19,3 +19,9 @@ public record LabTestUpdateDto(
     string? DefaultUnit,
     decimal? DefaultPrice,
     bool Active);
+
+public record LabTestPublicDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? DefaultUnit);
