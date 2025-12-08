@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext'
 
 export default function Patients() {
   const { user } = useAuth()
+  const canManage = user?.role === 'admin'
+  const canView = canManage || user?.role === 'recepcion' || user?.isRecepcion
   const [items, setItems] = useState([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
@@ -33,7 +35,7 @@ export default function Patients() {
   }
 
   const fetchData = async () => {
-    if (user?.role !== 'admin') return
+    if (!canView) return
     setLoading(true)
     setError('')
     setSuccessMessage('')
@@ -49,14 +51,15 @@ export default function Patients() {
   }
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (canView) {
       fetchData()
     } else {
       setLoading(false)
     }
-  }, [user?.role])
+  }, [canView])
 
   const openForm = item => {
+    if (!canManage) return
     if (item) {
       setFormData({
         fullName: item.fullName ?? '',
@@ -173,7 +176,7 @@ export default function Patients() {
         </span>
       ),
     },
-    ...(user?.role === 'admin'
+    ...(canManage
       ? [
         {
           key: 'actions',
@@ -199,7 +202,7 @@ export default function Patients() {
   ]
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
-  if (user?.role !== 'admin') {
+  if (!canView) {
     return (
       <section className="space-y-4">
         <div className="rounded-2xl bg-white/70 px-6 py-5 shadow-sm ring-1 ring-slate-200/60">
@@ -222,12 +225,18 @@ export default function Patients() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Listado de pacientes</h3>
-            <p className="text-sm text-gray-600">Filtra, crea o edita los perfiles registrados en LABOTEC.</p>
+            <p className="text-sm text-gray-600">
+              {canManage
+                ? 'Filtra, crea o edita los perfiles registrados en LABOTEC.'
+                : 'Filtra y revisa la información básica de los pacientes registrados.'}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
             <button onClick={fetchData} className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Buscar</button>
-            <button onClick={() => openForm(null)} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Agregar paciente</button>
+            {canManage && (
+              <button onClick={() => openForm(null)} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Agregar paciente</button>
+            )}
           </div>
         </div>
         <div className="mt-4 space-y-3">
