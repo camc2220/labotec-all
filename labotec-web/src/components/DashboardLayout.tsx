@@ -10,7 +10,7 @@ import {
   Settings,
   FlaskConical,
   DollarSign,
-} from 'lucide-react';
+} from '../icons';
 import { UserRole } from '../types';
 
 export const DashboardLayout: React.FC = () => {

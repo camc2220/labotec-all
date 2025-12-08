@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Search } from 'lucide-react';
+import { CheckCircle2, Search } from '../icons';
 import { LabTestService } from '../types';
 
 const MOCK_SERVICES: LabTestService[] = [

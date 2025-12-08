@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { patientService } from '../../services/patientService';
-import { Calendar, Clock, FileText, Activity, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, FileText, Activity, AlertCircle } from '../../icons';
 import { Link } from 'react-router-dom';
 import { Appointment, LabResult } from '../../types';
 

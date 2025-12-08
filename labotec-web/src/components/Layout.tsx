@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Menu, X, Phone, MapPin, FlaskConical, UserCircle } from 'lucide-react';
+import { Menu, X, Phone, MapPin, FlaskConical, User } from '../icons';
 import { COMPANY_INFO } from '../constants';
 import { useAuth } from '../context/AuthContext';
 

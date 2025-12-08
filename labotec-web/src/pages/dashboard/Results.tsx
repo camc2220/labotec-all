@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, FileText, Search } from 'lucide-react';
+import { Download, FileText, Search } from '../../icons';
 import { patientService } from '../../services/patientService';
 import { LabResult } from '../../types';
 

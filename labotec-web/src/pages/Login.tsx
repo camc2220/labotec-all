@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FlaskConical, Lock, User, AlertCircle } from 'lucide-react';
+import { FlaskConical, Lock, User, AlertCircle } from '../icons';
 
 export const Login: React.FC = () => {
   const [username, setUsername] = useState('');

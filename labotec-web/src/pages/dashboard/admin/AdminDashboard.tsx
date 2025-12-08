@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Users, Beaker, TrendingUp, Settings, Trash2, Edit, Plus, Loader2, Upload, FileText } from 'lucide-react';
+import { Users, Beaker, TrendingUp, Settings, Trash2, Edit, Plus, Loader2, Upload, FileText } from '../../../icons';
 import { adminService } from '../../../services/adminService';
 import { staffService } from '../../../services/staffService';
 import { User, UserRole, LabTestService, LabResult } from '../../../types';

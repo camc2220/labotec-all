@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { DollarSign, FileText, CreditCard, CheckCircle, Search, Download, Filter } from 'lucide-react';
+import { DollarSign, FileText, CreditCard, CheckCircle, Search, Download, Filter } from '../../../icons';
 import { staffService } from '../../../services/staffService';
 import { Invoice } from '../../../types';
 

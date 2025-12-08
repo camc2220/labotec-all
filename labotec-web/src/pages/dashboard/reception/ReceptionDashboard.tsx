@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, CheckCircle, Clock, Search, UserPlus, Users, Loader2, Filter, FileText, FlaskConical, User as UserIcon } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Search, UserPlus, Users, Loader2, Filter, FileText, FlaskConical, User as UserIcon } from '../../../icons';
 import { staffService } from '../../../services/staffService';
 import { Appointment, LabOrder, LabTestService, User } from '../../../types';
 import { Modal } from '../../../components/Modal';

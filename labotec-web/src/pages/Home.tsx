@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Clock, ShieldCheck, Microscope, Award } from 'lucide-react';
+import { ArrowRight, Clock, ShieldCheck, Microscope, Award } from '../icons';
 import { COMPANY_INFO } from '../constants';
 
 export const Home: React.FC = () => {

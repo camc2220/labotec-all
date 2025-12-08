@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, CheckCircle, AlertCircle, Loader2 } from '../../icons';
 import { patientService } from '../../services/patientService';
 import { useAuth } from '../../context/AuthContext';
 
