@@ -27,7 +27,10 @@ export default function Home() {
   const [activeTests, setActiveTests] = useState([])
   const [testsLoading, setTestsLoading] = useState(true)
   const [testsError, setTestsError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [visibleStart, setVisibleStart] = useState(0)
+
+  const normalizeText = (value) => (value ?? '').toString().toLowerCase()
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
@@ -89,12 +92,26 @@ export default function Home() {
     loadActiveTests()
   }, [])
 
-  const totalActiveTests = activeTests.length
-  const visibleCount = Math.min(5, totalActiveTests)
+  const filteredTests = searchQuery
+    ? activeTests.filter((test) => {
+        const name = normalizeText(test.name ?? test.Name)
+        const code = normalizeText(test.code ?? test.Code)
+        const query = normalizeText(searchQuery)
+
+        return name.includes(query) || code.includes(query)
+      })
+    : activeTests
+
+  useEffect(() => {
+    setVisibleStart(0)
+  }, [searchQuery, filteredTests.length])
+
+  const totalFilteredTests = filteredTests.length
+  const visibleCount = Math.min(5, totalFilteredTests)
   const visibleTests =
-    totalActiveTests <= 5
-      ? activeTests
-      : Array.from({ length: visibleCount }, (_, index) => activeTests[(visibleStart + index) % totalActiveTests])
+    totalFilteredTests <= 5
+      ? filteredTests
+      : Array.from({ length: visibleCount }, (_, index) => filteredTests[(visibleStart + index) % totalFilteredTests])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
@@ -334,59 +351,86 @@ export default function Home() {
           <div className="rounded-3xl border border-sky-100 bg-white/80 p-8 shadow-lg shadow-sky-100/60">
             <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Servicios</p>
             <h3 className="mt-1 text-xl font-semibold text-gray-900">Pruebas disponibles para agendar</h3>
-            <p className="mt-2 text-sm text-gray-600">Consulta las pruebas activas antes de finalizar tu registro. Los precios se cotizan después del contacto con nuestro equipo.</p>
+            <p className="mt-2 text-sm text-gray-600">Consulta las pruebas activas antes de finalizar tu registro. Filtra por nombre o código para encontrar lo que necesitas.</p>
 
-            <div className="mt-5 grid gap-4 text-sm text-gray-700 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-3">
-              {testsError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">{testsError}</div>}
-              <div className="space-y-3">
-                {testsLoading ? (
-                  <div className="space-y-2">
-                    <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
-                    <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
-                    <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
-                  </div>
-                ) : activeTests.length > 0 ? (
-                  visibleTests.map((test) => {
-                    const testName = test.name ?? test.Name
-                    const code = test.code ?? test.Code
-                    const unit = test.defaultUnit ?? test.DefaultUnit
-                    return (
-                      <div key={code || testName} className="flex items-start justify-between rounded-2xl border border-sky-100 bg-white/60 px-4 py-3 shadow-sm">
-                        <div>
-                          <p className="font-semibold text-gray-900">{testName}</p>
-                          <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : code ? `Código: ${code}` : 'Prueba disponible'}</p>
-                        </div>
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Activa</span>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">No hay servicios activos disponibles en este momento.</div>
-                )}
+            <div className="mt-5 space-y-4 rounded-2xl border border-sky-100 bg-sky-50/40 p-4 text-sm text-gray-700">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">Catálogo actualizado</p>
+                  <p className="text-xs text-gray-500">{totalFilteredTests} {totalFilteredTests === 1 ? 'servicio coincide' : 'servicios coinciden'} con tu búsqueda</p>
+                </div>
+                <label className="relative w-full sm:w-72">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">🔍</span>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full rounded-full border border-sky-100 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                    placeholder="Buscar por nombre o código"
+                  />
+                </label>
               </div>
 
-              <div className="flex items-center justify-center gap-2 rounded-2xl bg-sky-50/70 p-3 text-xs font-semibold text-sky-700 shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => setVisibleStart((prev) => (prev - 1 + totalActiveTests) % totalActiveTests)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={testsLoading || totalActiveTests <= 5}
-                  aria-label="Pruebas anteriores"
-                >
-                  ←
-                </button>
-                <div className="rounded-full bg-white px-4 py-2 text-[11px] uppercase tracking-wide text-sky-800">
-                  {totalActiveTests > 0 ? `Mostrando ${visibleCount} de ${totalActiveTests}` : '0 de 0'}
+              {testsError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">{testsError}</div>}
+
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="space-y-3">
+                  {testsLoading ? (
+                    <div className="space-y-2">
+                      <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
+                      <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
+                      <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
+                    </div>
+                  ) : totalFilteredTests > 0 ? (
+                    visibleTests.map((test) => {
+                      const testName = test.name ?? test.Name
+                      const code = test.code ?? test.Code
+                      const unit = test.defaultUnit ?? test.DefaultUnit
+                      return (
+                        <div key={code || testName} className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-semibold text-gray-900">{testName}</p>
+                              {code && <span className="rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">{code}</span>}
+                            </div>
+                            <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : 'Prueba disponible para agendamiento inmediato'}</p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                            <span className="rounded-full bg-emerald-100 px-3 py-1">Activa</span>
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">No encontramos servicios que coincidan con tu búsqueda.</div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setVisibleStart((prev) => (prev + 1) % totalActiveTests)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={testsLoading || totalActiveTests <= 5}
-                  aria-label="Pruebas siguientes"
-                >
-                  →
-                </button>
+
+                <div className="flex flex-col items-center gap-3 rounded-2xl bg-white/70 p-3 text-xs font-semibold text-sky-700 shadow-inner">
+                  <div className="rounded-full bg-sky-50 px-4 py-2 text-[11px] uppercase tracking-wide text-sky-800">
+                    {totalFilteredTests > 0 ? `Mostrando ${visibleCount} de ${totalFilteredTests}` : '0 de 0'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => totalFilteredTests > 0 && setVisibleStart((prev) => (prev - 1 + totalFilteredTests) % totalFilteredTests)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={testsLoading || totalFilteredTests <= 5}
+                      aria-label="Pruebas anteriores"
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => totalFilteredTests > 0 && setVisibleStart((prev) => (prev + 1) % totalFilteredTests)}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={testsLoading || totalFilteredTests <= 5}
+                      aria-label="Pruebas siguientes"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
