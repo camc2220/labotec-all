@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 
@@ -24,6 +24,9 @@ export default function Home() {
   const [registerData, setRegisterData] = useState(initialRegister)
   const [registerStatus, setRegisterStatus] = useState(null)
   const [registerLoading, setRegisterLoading] = useState(false)
+  const [activeTests, setActiveTests] = useState([])
+  const [testsLoading, setTestsLoading] = useState(true)
+  const [testsError, setTestsError] = useState('')
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
@@ -63,6 +66,26 @@ export default function Home() {
       setRegisterLoading(false)
     }
   }
+
+  useEffect(() => {
+    const loadActiveTests = async () => {
+      setTestsLoading(true)
+      setTestsError('')
+      try {
+        const response = await api.get('/api/labtests', { params: { page: 1, pageSize: 50, sortBy: 'Name' } })
+        const items = response.data.items ?? response.data.Items ?? []
+        const filtered = items.filter((item) => Boolean(item.active ?? item.Active))
+        setActiveTests(filtered)
+      } catch (error) {
+        console.error(error)
+        setTestsError('No pudimos cargar los servicios disponibles en este momento.')
+      } finally {
+        setTestsLoading(false)
+      }
+    }
+
+    loadActiveTests()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
@@ -193,7 +216,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="procesos" className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
+        <section id="procesos" className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-emerald-100 bg-white/80 p-8 shadow-lg shadow-emerald-100/50">
             <h2 className="text-2xl font-semibold text-gray-900">Registra tus datos como paciente</h2>
             <p className="mt-2 text-sm text-gray-600">Completa el formulario y recibirás un correo con la confirmación de tu usuario LABOTEC.</p>
@@ -299,6 +322,39 @@ export default function Home() {
             </form>
           </div>
 
+          <div className="rounded-3xl border border-sky-100 bg-white/80 p-8 shadow-lg shadow-sky-100/60">
+            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Servicios</p>
+            <h3 className="mt-1 text-xl font-semibold text-gray-900">Pruebas disponibles para agendar</h3>
+            <p className="mt-2 text-sm text-gray-600">Consulta las pruebas activas antes de finalizar tu registro. Los precios se cotizan después del contacto con nuestro equipo.</p>
+
+            <div className="mt-5 space-y-3 text-sm text-gray-700">
+              {testsError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">{testsError}</div>}
+              {testsLoading ? (
+                <div className="space-y-2">
+                  <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
+                  <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
+                  <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
+                </div>
+              ) : activeTests.length > 0 ? (
+                activeTests.map((test) => {
+                  const testName = test.name ?? test.Name
+                  const code = test.code ?? test.Code
+                  const unit = test.defaultUnit ?? test.DefaultUnit
+                  return (
+                    <div key={code || testName} className="flex items-start justify-between rounded-2xl border border-sky-100 bg-white/60 px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="font-semibold text-gray-900">{testName}</p>
+                        <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : code ? `Código: ${code}` : 'Prueba disponible'}</p>
+                      </div>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Activa</span>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">No hay servicios activos disponibles en este momento.</div>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="grid gap-6 rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-lg shadow-gray-100/60 lg:grid-cols-[1.1fr_1fr]">
