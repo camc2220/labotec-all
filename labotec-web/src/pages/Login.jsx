@@ -1,18 +1,21 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 export default function Login() {
   const [userName, setUserName] = useState('admin')
   const [password, setPassword] = useState('Labotec1@')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const onSubmit = async (e) => {
     e.preventDefault()
     setError('')
     try {
       await login(userName, password)
-      navigate('/app', { replace: true })
+      const params = new URLSearchParams(location.search)
+      const redirectTo = params.get('next') || '/app'
+      navigate(redirectTo, { replace: true })
     }
     catch { setError('Credenciales inválidas o API no disponible') }
   }

@@ -1,139 +1,28 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
-import api from '../lib/api'
-import PatientSelect from '../components/PatientSelect'
 
-const testOptions = [
+const highlights = [
+  {
+    title: 'Resultados en línea 24/7',
+  },
+  {
+    title: 'Tomas a domicilio',
+  },
+  {
+    title: 'Atención humana',
+  },
+]
+
+const services = [
   'Perfil completo de laboratorio',
   'Prueba de COVID-19',
   'Perfil tiroideo',
   'Panel prenatal',
-  'Chequeo ejecutivo'
-]
-
-const locations = [
-  'Sede Centro',
-  'Sede Norte',
-  'Sede Sur',
-  'Laboratorio móvil'
+  'Chequeo ejecutivo',
+  'Exámenes ocupacionales',
 ]
 
 export default function Home() {
-  const initialRegister = {
-    fullName: '',
-    documentId: '',
-    email: '',
-    phone: '',
-    birthDate: '',
-    testType: '',
-    password: ''
-  }
-
-  const initialAppointment = {
-    patientName: '',
-    patientId: '',
-    type: '',
-    preferredDate: '',
-    preferredTime: '',
-    location: '',
-    notes: ''
-  }
-
-  const [registerData, setRegisterData] = useState(initialRegister)
-  const [appointmentData, setAppointmentData] = useState(initialAppointment)
-  const [registerStatus, setRegisterStatus] = useState(null)
-  const [registerLoading, setRegisterLoading] = useState(false)
-  const [appointmentStatus, setAppointmentStatus] = useState(null)
-
-  const handleRegisterChange = (event) => {
-    const { name, value } = event.target
-    setRegisterData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleAppointmentChange = (event) => {
-    const { name, value } = event.target
-    setAppointmentData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleRegisterSubmit = async (event) => {
-    event.preventDefault()
-
-    const hasEmptyFields = Object.values(registerData).some((value) => !value)
-    if (hasEmptyFields) {
-      setRegisterStatus({ type: 'error', message: 'Por favor completa todos los campos para poder contactarte.' })
-      return
-    }
-
-    setRegisterLoading(true)
-    try {
-      const payload = {
-        fullName: registerData.fullName,
-        documentId: registerData.documentId,
-        email: registerData.email,
-        phone: registerData.phone,
-        birthDate: registerData.birthDate ? new Date(registerData.birthDate).toISOString() : null,
-        testType: registerData.testType,
-        password: registerData.password,
-        role: 'patient',
-        userName: registerData.email || registerData.phone
-      }
-      await api.post('/api/auth/register', payload)
-      setRegisterStatus({ type: 'success', message: `¡Gracias ${registerData.fullName}! Hemos creado tu usuario para que puedas iniciar sesión en LABOTEC.` })
-      setRegisterData(initialRegister)
-    } catch (error) {
-      console.error(error)
-      const serverMessage = error?.response?.data?.[0]?.description || 'No pudimos completar tu registro en este momento. Por favor intenta más tarde.'
-      setRegisterStatus({ type: 'error', message: serverMessage })
-    } finally {
-      setRegisterLoading(false)
-    }
-  }
-
-  const handleAppointmentSubmit = (event) => {
-    event.preventDefault()
-
-    const requiredFields = ['patientName', 'patientId', 'type', 'preferredDate', 'preferredTime', 'location']
-    const hasEmptyFields = requiredFields.some((field) => !appointmentData[field])
-    if (hasEmptyFields) {
-      setAppointmentStatus({ type: 'error', message: 'Necesitamos que completes los datos obligatorios marcados con * para agendar tu cita.' })
-      return
-    }
-
-    const scheduledAt = new Date(`${appointmentData.preferredDate}T${appointmentData.preferredTime}`)
-
-    if (Number.isNaN(scheduledAt.getTime())) {
-      setAppointmentStatus({ type: 'error', message: 'La fecha y hora seleccionadas no son válidas. Revisa los datos e intenta de nuevo.' })
-      return
-    }
-
-    const payload = {
-      patientId: appointmentData.patientId,
-      scheduledAt: scheduledAt.toISOString(),
-      type: appointmentData.type,
-      notes: [
-        appointmentData.notes,
-        appointmentData.location ? `Sede solicitada: ${appointmentData.location}` : null,
-        appointmentData.patientName ? `Contacto: ${appointmentData.patientName}` : null,
-      ].filter(Boolean).join(' | ')
-    }
-
-    api.post('/api/appointments', payload)
-      .then(() => {
-        setAppointmentStatus({
-          type: 'success',
-          message: `Tu cita para el ${appointmentData.preferredDate} a las ${appointmentData.preferredTime} fue enviada para confirmación.`
-        })
-        setAppointmentData(initialAppointment)
-      })
-      .catch((error) => {
-        console.error(error)
-        const message = error?.response?.status === 401 || error?.response?.status === 403
-          ? 'Inicia sesión con un usuario autorizado para confirmar citas.'
-          : 'No pudimos enviar tu solicitud de cita. Intenta nuevamente o comunícate con recepción.'
-        setAppointmentStatus({ type: 'error', message })
-      })
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
       <header className="border-b bg-white/80 backdrop-blur sticky top-0 z-10">
@@ -147,13 +36,17 @@ export default function Home() {
           </div>
           <nav className="hidden gap-6 md:flex">
             <a href="#servicios" className="hover:text-sky-600">Servicios</a>
-            <a href="#procesos" className="hover:text-sky-600">¿Cómo funciona?</a>
-            <a href="#agendar" className="hover:text-sky-600">Agendar cita</a>
+            <a href="#citas" className="hover:text-sky-600">Mis citas</a>
             <a href="#contacto" className="hover:text-sky-600">Contacto</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="hidden text-sky-600 hover:text-sky-700 md:inline">Soy paciente registrado</Link>
-            <a href="#agendar" className="rounded-full bg-sky-600 px-4 py-2 text-white shadow hover:bg-sky-700">Agenda ahora</a>
+            <Link to="/login" className="hidden text-sky-600 hover:text-sky-700 md:inline">Iniciar sesión</Link>
+            <Link
+              to="/login?next=/app/appointments"
+              className="rounded-full bg-sky-600 px-4 py-2 text-white shadow hover:bg-sky-700"
+            >
+              Ir a mis citas
+            </Link>
           </div>
         </div>
       </header>
@@ -163,331 +56,150 @@ export default function Home() {
           <div className="flex flex-col gap-6">
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-sky-600 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Resultados confiables para tu bienestar
+              Cuidado clínico confiable
             </span>
             <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl lg:text-5xl">
-              Regístrate en LABOTEC y agenda tu prueba de laboratorio en minutos
+              Tu salud primero con un portal sencillo y rápido
             </h1>
             <p className="text-base text-gray-600 sm:text-lg">
-              Somos tu aliado en diagnóstico clínico. Regístrate como paciente nuevo, selecciona la prueba que necesitas y reserva la fecha y hora que mejor se ajusten a tu rutina.
+              Accede a tus citas, resultados y servicios destacados desde un solo lugar. LABOTEC simplifica tu experiencia para que te concentres en sentirte bien.
             </p>
             <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                Resultados en línea 24/7
-              </div>
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Atención domiciliaria disponible
-              </div>
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                Cobertura con aseguradoras aliadas
-              </div>
+              {highlights.map((item) => (
+                <div key={item.title} className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  {item.title}
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Link
+                to="/login?next=/app/appointments"
+                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-sky-200 transition hover:-translate-y-0.5 hover:bg-sky-700"
+              >
+                Ver mis citas
+              </Link>
+              <a
+                href="#servicios"
+                className="inline-flex items-center justify-center rounded-full border border-sky-100 bg-white px-5 py-3 text-sm font-semibold text-sky-700 shadow-sm transition hover:border-sky-200 hover:text-sky-800"
+              >
+                Explorar servicios
+              </a>
             </div>
           </div>
           <div className="relative">
             <div className="absolute -left-6 -top-6 hidden h-28 w-28 rounded-3xl bg-emerald-200/50 blur-2xl lg:block" />
             <div className="absolute -bottom-8 -right-8 hidden h-32 w-32 rounded-full bg-sky-200/60 blur-2xl lg:block" />
-            <div className="relative rounded-3xl border border-sky-100 bg-white p-6 shadow-xl shadow-sky-100/70">
-              <p className="text-sm font-semibold text-gray-900">Agendamiento Express</p>
-              <p className="mt-2 text-sm text-gray-600">Completa tu registro y confirma tu cita en tres sencillos pasos.</p>
-              <ol className="mt-4 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">1</span>
+            <div className="relative overflow-hidden rounded-3xl border border-sky-100 bg-white p-6 shadow-xl shadow-sky-100/70">
+              <p className="text-sm font-semibold text-gray-900">Portal de pacientes LABOTEC</p>
+              <p className="mt-2 text-sm text-gray-600">Todo lo que necesitas en un panel limpio y fácil de usar.</p>
+              <div className="mt-6 grid gap-4 text-sm text-gray-700">
+                <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-sky-50/60 p-4">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-sky-600" />
                   <div>
-                    <p className="font-semibold">Cuéntanos sobre ti</p>
-                    <p className="text-xs text-gray-500">Registra tus datos básicos y tus preferencias de contacto.</p>
+                    <p className="font-semibold text-gray-900">Citas en segundos</p>
+                    <p className="text-xs text-gray-600">Ingresa y revisa disponibilidad sin llenar formularios extensos.</p>
                   </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">2</span>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
                   <div>
-                    <p className="font-semibold">Elige la prueba clínica</p>
-                    <p className="text-xs text-gray-500">Selecciona entre nuestros perfiles especializados.</p>
+                    <p className="font-semibold text-gray-900">Resultados siempre contigo</p>
+                    <p className="text-xs text-gray-600">Consulta tus reportes, compártelos y descárgalos cuando lo necesites.</p>
                   </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">3</span>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+                  <span className="mt-1 h-2 w-2 rounded-full bg-amber-500" />
                   <div>
-                    <p className="font-semibold">Reserva tu cita</p>
-                    <p className="text-xs text-gray-500">Elige fecha, hora y sede disponibles en tiempo real.</p>
+                    <p className="font-semibold text-gray-900">Acompañamiento personalizado</p>
+                    <p className="text-xs text-gray-600">Un equipo atento a resolver tus dudas por chat, teléfono o en sede.</p>
                   </div>
-                </li>
-              </ol>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="servicios" className="grid gap-6 rounded-3xl bg-white/80 p-8 shadow-lg shadow-sky-100/60 lg:grid-cols-3">
+        <section id="servicios" className="grid gap-6 rounded-3xl bg-white/80 p-8 shadow-lg shadow-sky-100/60 lg:grid-cols-[1.1fr_1fr]">
           <div className="flex flex-col gap-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Por qué elegirnos</p>
-            <h2 className="text-2xl font-semibold text-gray-900">Tecnología, precisión y acompañamiento humano</h2>
+            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Servicios destacados</p>
+            <h2 className="text-2xl font-semibold text-gray-900">Pruebas confiables con resultados oportunos</h2>
             <p className="text-sm text-gray-600">
-              LABOTEC combina equipos de última generación con un equipo multidisciplinario de especialistas que acompañan a cada paciente durante todo el proceso.
+              Selecciona el examen que necesitas y nuestro equipo coordinará la mejor experiencia para ti. Contamos con cobertura en sedes principales y servicio móvil.
             </p>
-          </div>
-          <div className="space-y-4 text-sm text-gray-600">
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Resultados rápidos</p>
-              <p className="mt-1 text-xs text-gray-500">Más del 85% de las pruebas se entregan en menos de 24 horas.</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Convenios con aseguradoras</p>
-              <p className="mt-1 text-xs text-gray-500">Aceptamos los principales planes de salud y contamos con tarifas preferenciales.</p>
+            <div className="mt-2 grid grid-cols-1 gap-3 text-sm text-gray-700 sm:grid-cols-2">
+              {services.map((service) => (
+                <div key={service} className="flex items-center gap-2 rounded-xl border border-gray-100 bg-white px-3 py-3 shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-sky-500" />
+                  {service}
+                </div>
+              ))}
             </div>
           </div>
-          <div className="space-y-4 text-sm text-gray-600">
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Atención personalizada</p>
-              <p className="mt-1 text-xs text-gray-500">Nuestro equipo de enfermería te acompaña antes, durante y después del procedimiento.</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Resultados digitales seguros</p>
-              <p className="mt-1 text-xs text-gray-500">Consulta tus resultados desde cualquier dispositivo con autenticación segura.</p>
+          <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-6 shadow-lg shadow-emerald-100/50">
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">Atención cálida</p>
+            <p className="mt-2 text-lg font-semibold text-gray-900">Resultados rápidos y soporte humano en cada visita</p>
+            <p className="mt-3 text-sm text-gray-600">Más del 85% de los estudios se entregan en menos de 24 horas.</p>
+            <div className="mt-6 space-y-3 text-sm text-gray-700">
+              <div className="flex items-start gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm">
+                <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
+                <p>Salas cómodas y personal certificado para todas tus pruebas.</p>
+              </div>
+              <div className="flex items-start gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm">
+                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
+                <p>Entrega digital y física según tus necesidades.</p>
+              </div>
+              <div className="flex items-start gap-3 rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm">
+                <span className="mt-1 h-2 w-2 rounded-full bg-amber-500" />
+                <p>Asesoría para pacientes pediátricos, adultos mayores y empresas.</p>
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="procesos" className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
-          <div className="rounded-3xl border border-emerald-100 bg-white/80 p-8 shadow-lg shadow-emerald-100/50">
-            <h2 className="text-2xl font-semibold text-gray-900">Registra tus datos como paciente</h2>
-            <p className="mt-2 text-sm text-gray-600">Completa el formulario y recibirás un correo con la confirmación de tu usuario LABOTEC.</p>
-            <form onSubmit={handleRegisterSubmit} className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label htmlFor="fullName" className="text-sm font-medium text-gray-700">Nombre completo *</label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  value={registerData.fullName}
-                  onChange={handleRegisterChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. Ana María Rodríguez"
-                />
+        <section
+          id="citas"
+          className="grid gap-6 rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-lg shadow-gray-100/60 lg:grid-cols-[1fr_0.9fr]"
+        >
+          <div className="flex flex-col gap-4">
+            <h2 className="text-2xl font-semibold text-gray-900">Accede a tus citas en segundos</h2>
+            <p className="text-sm text-gray-600">
+              Reemplazamos el formulario extenso por un acceso directo. Ingresa al portal, revisa tus próximas citas y gestiona cambios con un par de clics.
+            </p>
+            <div className="grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+              <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-sky-50/60 px-4 py-3">
+                <span className="mt-1 h-2 w-2 rounded-full bg-sky-600" />
+                <p>Ver calendario y confirmar disponibilidad.</p>
               </div>
-              <div>
-                <label htmlFor="documentId" className="text-sm font-medium text-gray-700">Documento de identidad *</label>
-                <input
-                  id="documentId"
-                  name="documentId"
-                  value={registerData.documentId}
-                  onChange={handleRegisterChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. CC 123456789"
-                />
+              <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-white px-4 py-3">
+                <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
+                <p>Solicitar cambios o agregar notas especiales.</p>
               </div>
-              <div>
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">Correo electrónico *</label>
-                <input
-                  id="email"
-                  name="email"
-                  value={registerData.email}
-                  onChange={handleRegisterChange}
-                  type="email"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="tucorreo@ejemplo.com"
-                />
+              <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-white px-4 py-3">
+                <span className="mt-1 h-2 w-2 rounded-full bg-amber-500" />
+                <p>Recibir recordatorios y ubicaciones de sede.</p>
               </div>
-              <div>
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">Crea tu contraseña *</label>
-                <input
-                  id="password"
-                  name="password"
-                  value={registerData.password}
-                  onChange={handleRegisterChange}
-                  type="password"
-                  minLength={8}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Mínimo 8 caracteres"
-                />
-                <p className="mt-1 text-xs text-gray-500">Esta contraseña te permitirá ingresar al portal de pacientes.</p>
+              <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-white px-4 py-3">
+                <span className="mt-1 h-2 w-2 rounded-full bg-indigo-500" />
+                <p>Descargar comprobantes y resultados posteriores.</p>
               </div>
-              <div>
-                <label htmlFor="phone" className="text-sm font-medium text-gray-700">Teléfono de contacto *</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  value={registerData.phone}
-                  onChange={handleRegisterChange}
-                  type="tel"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. +57 320 123 4567"
-                />
-              </div>
-              <div>
-                <label htmlFor="birthDate" className="text-sm font-medium text-gray-700">Fecha de nacimiento *</label>
-                <input
-                  id="birthDate"
-                  name="birthDate"
-                  value={registerData.birthDate}
-                  onChange={handleRegisterChange}
-                  type="date"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label htmlFor="testType" className="text-sm font-medium text-gray-700">Tipo de prueba que necesitas *</label>
-                <select
-                  id="testType"
-                  name="testType"
-                  value={registerData.testType}
-                  onChange={handleRegisterChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una opción</option>
-                  {testOptions.map((test) => (
-                    <option key={test} value={test}>{test}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="md:col-span-2 flex flex-col gap-3">
-                <button type="submit" className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed" disabled={registerLoading}>
-                  {registerLoading ? 'Enviando...' : 'Registrarme como paciente'}
-                </button>
-                {registerStatus && (
-                  <p className={`text-sm ${registerStatus.type === 'success' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {registerStatus.message}
-                  </p>
-                )}
-              </div>
-            </form>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <Link
+                to="/login?next=/app/appointments"
+                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-sky-700"
+              >
+                Entrar para ver mis citas
+              </Link>
+              <p className="text-xs text-gray-500">Si aún no tienes usuario, solicita tu acceso con nuestro equipo de recepción.</p>
+            </div>
           </div>
-
-          <div id="agendar" className="rounded-3xl border border-sky-100 bg-white/80 p-8 shadow-lg shadow-sky-100/60">
-            <h2 className="text-2xl font-semibold text-gray-900">Agenda tu cita de laboratorio</h2>
-            <p className="mt-2 text-sm text-gray-600">Escoge la fecha y hora que prefieras. Un asesor confirmará la disponibilidad.</p>
-            <form onSubmit={handleAppointmentSubmit} className="mt-6 grid gap-4">
-              <div>
-                <label htmlFor="patientName" className="text-sm font-medium text-gray-700">Nombre del paciente *</label>
-                <input
-                  id="patientName"
-                  name="patientName"
-                  value={appointmentData.patientName}
-                  onChange={handleAppointmentChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. Ana María Rodríguez"
-                />
-              </div>
-              <div>
-                <PatientSelect
-                  value={appointmentData.patientId}
-                  onChange={patientId => setAppointmentData(prev => ({ ...prev, patientId }))}
-                  required
-                  label="Paciente registrado"
-                />
-              </div>
-              <div>
-                <label htmlFor="type" className="text-sm font-medium text-gray-700">Tipo de prueba *</label>
-                <select
-                  id="type"
-                  name="type"
-                  value={appointmentData.type}
-                  onChange={handleAppointmentChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una opción</option>
-                  {testOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="preferredDate" className="text-sm font-medium text-gray-700">Fecha preferida *</label>
-                  <input
-                    id="preferredDate"
-                    name="preferredDate"
-                    value={appointmentData.preferredDate}
-                    onChange={handleAppointmentChange}
-                    type="date"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="preferredTime" className="text-sm font-medium text-gray-700">Hora preferida *</label>
-                  <input
-                    id="preferredTime"
-                    name="preferredTime"
-                    value={appointmentData.preferredTime}
-                    onChange={handleAppointmentChange}
-                    type="time"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="location" className="text-sm font-medium text-gray-700">Sede preferida *</label>
-                <select
-                  id="location"
-                  name="location"
-                  value={appointmentData.location}
-                  onChange={handleAppointmentChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una sede</option>
-                  {locations.map((location) => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="notes" className="text-sm font-medium text-gray-700">Observaciones adicionales</label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={appointmentData.notes}
-                  onChange={handleAppointmentChange}
-                  rows="3"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="¿Necesitas toma de muestra a domicilio? ¿Vienes en ayunas?"
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <button type="submit" className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-emerald-600">
-                  Solicitar confirmación de cita
-                </button>
-                {appointmentStatus && (
-                  <p className={`text-sm ${appointmentStatus.type === 'success' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {appointmentStatus.message}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <section className="grid gap-6 rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-lg shadow-gray-100/60 lg:grid-cols-[1.1fr_1fr]">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">¿Qué puedes esperar el día de tu cita?</h2>
-            <p className="mt-2 text-sm text-gray-600">Queremos que vivas una experiencia cómoda y segura de principio a fin.</p>
-            <ul className="mt-6 space-y-4 text-sm text-gray-600">
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Recepción ágil con tu documento y el correo de confirmación.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Personal certificado y salas confortables para la toma de muestras.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Acompañamiento para pacientes pediátricos y adultos mayores.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Resultados disponibles en línea y entrega física según necesidad.
-              </li>
-            </ul>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-emerald-500 p-6 text-white">
-            <p className="text-xs uppercase tracking-widest text-white/80">Pacientes felices</p>
-            <p className="mt-3 text-lg font-semibold">"El proceso de agendamiento fue inmediato y me atendieron con calidez desde el primer contacto."</p>
+          <div className="flex flex-col justify-center rounded-3xl bg-gradient-to-br from-sky-500 via-sky-600 to-emerald-500 p-6 text-white shadow-lg shadow-sky-200/60">
+            <p className="text-xs uppercase tracking-widest text-white/80">Experiencia simplificada</p>
+            <p className="mt-3 text-lg font-semibold">"Encontré mis citas y resultados en segundos. El portal es claro y elegante."</p>
             <p className="mt-4 text-sm text-white/80">Laura G. · Paciente desde 2023</p>
             <div className="mt-6 rounded-2xl bg-white/10 p-4 text-sm text-white/80">
-              <p className="font-semibold text-white">¿Tienes dudas sobre una prueba específica?</p>
+              <p className="font-semibold text-white">¿Necesitas ayuda?</p>
               <p className="mt-2">Escríbenos por WhatsApp al <span className="font-semibold">+57 320 111 2233</span> o agenda una llamada con un asesor.</p>
             </div>
           </div>
