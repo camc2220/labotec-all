@@ -102,15 +102,15 @@ export default function Home() {
               Somos tu aliado en diagnóstico clínico. Regístrate como paciente nuevo, selecciona la prueba que necesitas y reserva la fecha y hora que mejor se ajusten a tu rutina.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <a
-                href="#procesos"
-                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-sky-700"
-              >
-                Registrarme y agendar
-              </a>
               <Link
                 to="/login?next=/app/appointments"
-                className="inline-flex items-center justify-center rounded-full border border-sky-100 bg-white px-5 py-3 text-sm font-semibold text-sky-700 shadow-sm transition hover:border-sky-200 hover:text-sky-800"
+                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-sky-700"
+              >
+                Registrarme y agendar
+              </Link>
+              <Link
+                to="/login?next=/app/appointments"
+                className="inline-flex items-center justify-center rounded-full border border-sky-100 bg-white px-6 py-3.5 text-base font-semibold text-sky-700 shadow-sm transition hover:border-sky-200 hover:text-sky-800"
               >
                 Ver mis citas
               </Link>
