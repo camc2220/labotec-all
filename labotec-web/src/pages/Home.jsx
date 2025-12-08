@@ -27,6 +27,7 @@ export default function Home() {
   const [activeTests, setActiveTests] = useState([])
   const [testsLoading, setTestsLoading] = useState(true)
   const [testsError, setTestsError] = useState('')
+  const [visibleStart, setVisibleStart] = useState(0)
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
@@ -76,6 +77,7 @@ export default function Home() {
         const items = response.data.items ?? response.data.Items ?? []
         const filtered = items.filter((item) => Boolean(item.active ?? item.Active))
         setActiveTests(filtered)
+        setVisibleStart(0)
       } catch (error) {
         console.error(error)
         setTestsError('No pudimos cargar los servicios disponibles en este momento.')
@@ -86,6 +88,13 @@ export default function Home() {
 
     loadActiveTests()
   }, [])
+
+  const totalActiveTests = activeTests.length
+  const visibleCount = Math.min(5, totalActiveTests)
+  const visibleTests =
+    totalActiveTests <= 5
+      ? activeTests
+      : Array.from({ length: visibleCount }, (_, index) => activeTests[(visibleStart + index) % totalActiveTests])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
@@ -327,32 +336,58 @@ export default function Home() {
             <h3 className="mt-1 text-xl font-semibold text-gray-900">Pruebas disponibles para agendar</h3>
             <p className="mt-2 text-sm text-gray-600">Consulta las pruebas activas antes de finalizar tu registro. Los precios se cotizan después del contacto con nuestro equipo.</p>
 
-            <div className="mt-5 space-y-3 text-sm text-gray-700">
+            <div className="mt-5 grid gap-4 text-sm text-gray-700 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-3">
               {testsError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">{testsError}</div>}
-              {testsLoading ? (
-                <div className="space-y-2">
-                  <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
-                  <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
-                  <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
-                </div>
-              ) : activeTests.length > 0 ? (
-                activeTests.map((test) => {
-                  const testName = test.name ?? test.Name
-                  const code = test.code ?? test.Code
-                  const unit = test.defaultUnit ?? test.DefaultUnit
-                  return (
-                    <div key={code || testName} className="flex items-start justify-between rounded-2xl border border-sky-100 bg-white/60 px-4 py-3 shadow-sm">
-                      <div>
-                        <p className="font-semibold text-gray-900">{testName}</p>
-                        <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : code ? `Código: ${code}` : 'Prueba disponible'}</p>
+              <div className="space-y-3">
+                {testsLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
+                    <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
+                    <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
+                  </div>
+                ) : activeTests.length > 0 ? (
+                  visibleTests.map((test) => {
+                    const testName = test.name ?? test.Name
+                    const code = test.code ?? test.Code
+                    const unit = test.defaultUnit ?? test.DefaultUnit
+                    return (
+                      <div key={code || testName} className="flex items-start justify-between rounded-2xl border border-sky-100 bg-white/60 px-4 py-3 shadow-sm">
+                        <div>
+                          <p className="font-semibold text-gray-900">{testName}</p>
+                          <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : code ? `Código: ${code}` : 'Prueba disponible'}</p>
+                        </div>
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Activa</span>
                       </div>
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Activa</span>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">No hay servicios activos disponibles en este momento.</div>
-              )}
+                    )
+                  })
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">No hay servicios activos disponibles en este momento.</div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-center gap-2 rounded-2xl bg-sky-50/70 p-3 text-xs font-semibold text-sky-700 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setVisibleStart((prev) => (prev - 1 + totalActiveTests) % totalActiveTests)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={testsLoading || totalActiveTests <= 5}
+                  aria-label="Pruebas anteriores"
+                >
+                  ←
+                </button>
+                <div className="rounded-full bg-white px-4 py-2 text-[11px] uppercase tracking-wide text-sky-800">
+                  {totalActiveTests > 0 ? `Mostrando ${visibleCount} de ${totalActiveTests}` : '0 de 0'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVisibleStart((prev) => (prev + 1) % totalActiveTests)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={testsLoading || totalActiveTests <= 5}
+                  aria-label="Pruebas siguientes"
+                >
+                  →
+                </button>
+              </div>
             </div>
           </div>
         </section>
