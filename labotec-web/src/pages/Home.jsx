@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
-import PatientSelect from '../components/PatientSelect'
 
 const testOptions = [
   'Perfil completo de laboratorio',
@@ -9,13 +8,6 @@ const testOptions = [
   'Perfil tiroideo',
   'Panel prenatal',
   'Chequeo ejecutivo'
-]
-
-const locations = [
-  'Sede Centro',
-  'Sede Norte',
-  'Sede Sur',
-  'Laboratorio móvil'
 ]
 
 export default function Home() {
@@ -29,30 +21,13 @@ export default function Home() {
     password: ''
   }
 
-  const initialAppointment = {
-    patientName: '',
-    patientId: '',
-    type: '',
-    preferredDate: '',
-    preferredTime: '',
-    location: '',
-    notes: ''
-  }
-
   const [registerData, setRegisterData] = useState(initialRegister)
-  const [appointmentData, setAppointmentData] = useState(initialAppointment)
   const [registerStatus, setRegisterStatus] = useState(null)
   const [registerLoading, setRegisterLoading] = useState(false)
-  const [appointmentStatus, setAppointmentStatus] = useState(null)
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
     setRegisterData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleAppointmentChange = (event) => {
-    const { name, value } = event.target
-    setAppointmentData((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleRegisterSubmit = async (event) => {
@@ -89,71 +64,26 @@ export default function Home() {
     }
   }
 
-  const handleAppointmentSubmit = (event) => {
-    event.preventDefault()
-
-    const requiredFields = ['patientName', 'patientId', 'type', 'preferredDate', 'preferredTime', 'location']
-    const hasEmptyFields = requiredFields.some((field) => !appointmentData[field])
-    if (hasEmptyFields) {
-      setAppointmentStatus({ type: 'error', message: 'Necesitamos que completes los datos obligatorios marcados con * para agendar tu cita.' })
-      return
-    }
-
-    const scheduledAt = new Date(`${appointmentData.preferredDate}T${appointmentData.preferredTime}`)
-
-    if (Number.isNaN(scheduledAt.getTime())) {
-      setAppointmentStatus({ type: 'error', message: 'La fecha y hora seleccionadas no son válidas. Revisa los datos e intenta de nuevo.' })
-      return
-    }
-
-    const payload = {
-      patientId: appointmentData.patientId,
-      scheduledAt: scheduledAt.toISOString(),
-      type: appointmentData.type,
-      notes: [
-        appointmentData.notes,
-        appointmentData.location ? `Sede solicitada: ${appointmentData.location}` : null,
-        appointmentData.patientName ? `Contacto: ${appointmentData.patientName}` : null,
-      ].filter(Boolean).join(' | ')
-    }
-
-    api.post('/api/appointments', payload)
-      .then(() => {
-        setAppointmentStatus({
-          type: 'success',
-          message: `Tu cita para el ${appointmentData.preferredDate} a las ${appointmentData.preferredTime} fue enviada para confirmación.`
-        })
-        setAppointmentData(initialAppointment)
-      })
-      .catch((error) => {
-        console.error(error)
-        const message = error?.response?.status === 401 || error?.response?.status === 403
-          ? 'Inicia sesión con un usuario autorizado para confirmar citas.'
-          : 'No pudimos enviar tu solicitud de cita. Intenta nuevamente o comunícate con recepción.'
-        setAppointmentStatus({ type: 'error', message })
-      })
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
-      <header className="border-b bg-white/80 backdrop-blur sticky top-0 z-10">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 text-sm text-gray-600">
+      <header className="border-b border-sky-900 bg-sky-800/95 backdrop-blur sticky top-0 z-10 text-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 text-sm text-white/90">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sky-600 font-semibold">L</div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">L</div>
             <div>
-              <p className="text-xs uppercase tracking-widest text-sky-600">LABOTEC</p>
-              <p className="text-sm font-semibold text-gray-900">Laboratorio Clínico</p>
+              <p className="text-xs uppercase tracking-widest text-white/90">LABOTEC</p>
+              <p className="text-sm font-semibold text-white">Laboratorio Clínico</p>
             </div>
           </div>
           <nav className="hidden gap-6 md:flex">
-            <a href="#servicios" className="hover:text-sky-600">Servicios</a>
-            <a href="#procesos" className="hover:text-sky-600">¿Cómo funciona?</a>
-            <a href="#agendar" className="hover:text-sky-600">Agendar cita</a>
-            <a href="#contacto" className="hover:text-sky-600">Contacto</a>
+            <a href="#servicios" className="transition hover:text-white">Servicios</a>
+            <a href="#procesos" className="transition hover:text-white">¿Cómo funciona?</a>
+            <a href="#procesos" className="transition hover:text-white">Registro de pacientes</a>
+            <a href="#contacto" className="transition hover:text-white">Contacto</a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link to="/login" className="hidden text-sky-600 hover:text-sky-700 md:inline">Soy paciente registrado</Link>
-            <a href="#agendar" className="rounded-full bg-sky-600 px-4 py-2 text-white shadow hover:bg-sky-700">Agenda ahora</a>
+            <Link to="/login" className="hidden text-white/90 transition hover:text-white md:inline">Soy paciente registrado</Link>
+            <a href="#procesos" className="rounded-full bg-white px-4 py-2 text-sky-900 font-semibold shadow hover:bg-slate-50">Agenda ahora</a>
           </div>
         </div>
       </header>
@@ -369,108 +299,6 @@ export default function Home() {
             </form>
           </div>
 
-          <div id="agendar" className="rounded-3xl border border-sky-100 bg-white/80 p-8 shadow-lg shadow-sky-100/60">
-            <h2 className="text-2xl font-semibold text-gray-900">Agenda tu cita de laboratorio</h2>
-            <p className="mt-2 text-sm text-gray-600">Escoge la fecha y hora que prefieras. Un asesor confirmará la disponibilidad.</p>
-            <form onSubmit={handleAppointmentSubmit} className="mt-6 grid gap-4">
-              <div>
-                <label htmlFor="patientName" className="text-sm font-medium text-gray-700">Nombre del paciente *</label>
-                <input
-                  id="patientName"
-                  name="patientName"
-                  value={appointmentData.patientName}
-                  onChange={handleAppointmentChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. Ana María Rodríguez"
-                />
-              </div>
-              <div>
-                <PatientSelect
-                  value={appointmentData.patientId}
-                  onChange={patientId => setAppointmentData(prev => ({ ...prev, patientId }))}
-                  required
-                  label="Paciente registrado"
-                />
-              </div>
-              <div>
-                <label htmlFor="type" className="text-sm font-medium text-gray-700">Tipo de prueba *</label>
-                <select
-                  id="type"
-                  name="type"
-                  value={appointmentData.type}
-                  onChange={handleAppointmentChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una opción</option>
-                  {testOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="preferredDate" className="text-sm font-medium text-gray-700">Fecha preferida *</label>
-                  <input
-                    id="preferredDate"
-                    name="preferredDate"
-                    value={appointmentData.preferredDate}
-                    onChange={handleAppointmentChange}
-                    type="date"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="preferredTime" className="text-sm font-medium text-gray-700">Hora preferida *</label>
-                  <input
-                    id="preferredTime"
-                    name="preferredTime"
-                    value={appointmentData.preferredTime}
-                    onChange={handleAppointmentChange}
-                    type="time"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="location" className="text-sm font-medium text-gray-700">Sede preferida *</label>
-                <select
-                  id="location"
-                  name="location"
-                  value={appointmentData.location}
-                  onChange={handleAppointmentChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una sede</option>
-                  {locations.map((location) => (
-                    <option key={location} value={location}>{location}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="notes" className="text-sm font-medium text-gray-700">Observaciones adicionales</label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={appointmentData.notes}
-                  onChange={handleAppointmentChange}
-                  rows="3"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="¿Necesitas toma de muestra a domicilio? ¿Vienes en ayunas?"
-                />
-              </div>
-              <div className="flex flex-col gap-3">
-                <button type="submit" className="rounded-full bg-emerald-500 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-emerald-600">
-                  Solicitar confirmación de cita
-                </button>
-                {appointmentStatus && (
-                  <p className={`text-sm ${appointmentStatus.type === 'success' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {appointmentStatus.message}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
         </section>
 
         <section className="grid gap-6 rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-lg shadow-gray-100/60 lg:grid-cols-[1.1fr_1fr]">
