@@ -80,7 +80,7 @@ mysql-data/
 *.db
 *.bak
 *.sql.gz
-data/
+#data/
 mysql/
 db/
 
