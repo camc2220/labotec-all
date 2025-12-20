@@ -1,4 +1,5 @@
 import React from 'react';
+import { Home as HomeIcon } from 'lucide-react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -61,6 +62,9 @@ export const DashboardLayout: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {/* Botón de Inicio global con casita */}
+        <NavItem to="/" icon={HomeIcon} label="Inicio" />
           {/* Patient */}
           {user?.role === UserRole.Paciente && (
             <>
