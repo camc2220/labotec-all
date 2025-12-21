@@ -1,1 +1,17 @@
-namespace Labotec.Api.DTOs; public record LabResultCreateDto(Guid PatientId, string TestName, string ResultValue, string Unit, DateTime? ReleasedAt, string? PdfUrl); public record LabResultReadDto(Guid Id, Guid PatientId, string PatientName, string TestName, string ResultValue, string Unit, DateTime ReleasedAt, string? PdfUrl); public record LabResultUpdateDto(string TestName, string ResultValue, string Unit, DateTime ReleasedAt, string? PdfUrl);
+namespace Labotec.Api.DTOs;
+
+public record LabResultCreateDto(Guid PatientId, string TestName, string ResultValue, string Unit, DateTime? ReleasedAt, string? PdfUrl);
+
+public record LabResultReadDto(
+    Guid Id,
+    Guid PatientId,
+    string PatientName,
+    string TestName,
+    string ResultValue,
+    string Unit,
+    string CreatedByName,
+    DateTime ReleasedAt,
+    string? PdfUrl
+);
+
+public record LabResultUpdateDto(string TestName, string ResultValue, string Unit, DateTime ReleasedAt, string? PdfUrl);
