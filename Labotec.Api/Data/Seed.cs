@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Data;
 using System.Data.Common;
 
 namespace Labotec.Api.Data;
@@ -122,8 +123,13 @@ public static class Seed
 
     private static async Task EnsureCreatedByNameColumnAsync(AppDbContext db)
     {
-        await using var connection = db.Database.GetDbConnection();
-        await connection.OpenAsync();
+        var connection = db.Database.GetDbConnection();
+        var wasOpen = connection.State == ConnectionState.Open;
+
+        if (!wasOpen)
+        {
+            await connection.OpenAsync();
+        }
 
         await using var checkCmd = connection.CreateCommand();
         checkCmd.CommandText = @"SELECT COUNT(*)
@@ -135,11 +141,21 @@ WHERE TABLE_SCHEMA = DATABASE()
         var exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
         if (exists)
         {
+            if (!wasOpen)
+            {
+                await connection.CloseAsync();
+            }
+
             return;
         }
 
         await using var alterCmd = connection.CreateCommand();
         alterCmd.CommandText = "ALTER TABLE `LabResults` ADD COLUMN `CreatedByName` varchar(160) NOT NULL DEFAULT '' AFTER `Unit`;";
         await alterCmd.ExecuteNonQueryAsync();
+
+        if (!wasOpen)
+        {
+            await connection.CloseAsync();
+        }
     }
 }
