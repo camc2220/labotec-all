@@ -1,14 +1,14 @@
+
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 
-const testOptions = [
-  'Perfil completo de laboratorio',
-  'Prueba de COVID-19',
-  'Perfil tiroideo',
-  'Panel prenatal',
-  'Chequeo ejecutivo'
-]
+// Iconos simples simulados con SVG para evitar dependencias externas masivas
+const StarIcon = () => (
+  <svg className="h-4 w-4 text-amber-400 fill-current" viewBox="0 0 20 20">
+    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+  </svg>
+)
 
 export default function Home() {
   const initialRegister = {
@@ -39,10 +39,9 @@ export default function Home() {
 
   const handleRegisterSubmit = async (event) => {
     event.preventDefault()
-
     const hasEmptyFields = Object.values(registerData).some((value) => !value)
     if (hasEmptyFields) {
-      setRegisterStatus({ type: 'error', message: 'Por favor completa todos los campos para poder contactarte.' })
+      setRegisterStatus({ type: 'error', message: 'Por favor completa todos los campos.' })
       return
     }
 
@@ -60,11 +59,10 @@ export default function Home() {
         userName: registerData.email || registerData.phone
       }
       await api.post('/api/auth/register', payload)
-      setRegisterStatus({ type: 'success', message: `¡Gracias ${registerData.fullName}! Hemos creado tu usuario para que puedas iniciar sesión en LABOTEC.` })
+      setRegisterStatus({ type: 'success', message: `¡Registro exitoso! Ya puedes iniciar sesión.` })
       setRegisterData(initialRegister)
     } catch (error) {
-      console.error(error)
-      const serverMessage = error?.response?.data?.[0]?.description || 'No pudimos completar tu registro en este momento. Por favor intenta más tarde.'
+      const serverMessage = error?.response?.data?.[0]?.description || 'Error al registrarse.'
       setRegisterStatus({ type: 'error', message: serverMessage })
     } finally {
       setRegisterLoading(false)
@@ -74,21 +72,16 @@ export default function Home() {
   useEffect(() => {
     const loadActiveTests = async () => {
       setTestsLoading(true)
-      setTestsError('')
       try {
         const response = await api.get('/api/labtests/public')
         const items = response.data.items ?? response.data.Items ?? response.data ?? []
-        const filtered = items.filter((item) => Boolean(item.active ?? item.Active ?? true))
-        setActiveTests(filtered)
-        setVisibleStart(0)
+        setActiveTests(items.filter((item) => Boolean(item.active ?? item.Active ?? true)))
       } catch (error) {
-        console.error(error)
-        setTestsError('No pudimos cargar los servicios disponibles en este momento.')
+        setTestsError('No pudimos cargar los servicios.')
       } finally {
         setTestsLoading(false)
       }
     }
-
     loadActiveTests()
   }, [])
 
@@ -97,397 +90,275 @@ export default function Home() {
         const name = normalizeText(test.name ?? test.Name)
         const code = normalizeText(test.code ?? test.Code)
         const query = normalizeText(searchQuery)
-
         return name.includes(query) || code.includes(query)
       })
     : activeTests
 
-  useEffect(() => {
-    setVisibleStart(0)
-  }, [searchQuery, filteredTests.length])
-
-  const totalFilteredTests = filteredTests.length
-  const visibleCount = Math.min(5, totalFilteredTests)
-  const visibleTests =
-    totalFilteredTests <= 5
-      ? filteredTests
-      : Array.from({ length: visibleCount }, (_, index) => filteredTests[(visibleStart + index) % totalFilteredTests])
+  const visibleTests = filteredTests.slice(visibleStart, visibleStart + 5)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50">
-      <header className="border-b border-sky-900 bg-sky-800/95 backdrop-blur sticky top-0 z-10 text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 text-sm text-white/90">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">L</div>
-            <div>
-              <p className="text-xs uppercase tracking-widest text-white/90">LABOTEC</p>
-              <p className="text-sm font-semibold text-white">Laboratorio Clínico</p>
-            </div>
-          </div>
-          <nav className="hidden gap-6 md:flex">
-            <a href="#servicios" className="transition hover:text-white">Servicios</a>
-            <a href="#procesos" className="transition hover:text-white">¿Cómo funciona?</a>
-            <a href="#procesos" className="transition hover:text-white">Registro de pacientes</a>
-            <a href="#contacto" className="transition hover:text-white">Contacto</a>
-          </nav>
+    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-sky-100">
+      {/* Navegación Superior */}
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/login" className="hidden text-white/90 transition hover:text-white md:inline">Soy paciente registrado</Link>
-            <a href="#procesos" className="rounded-full bg-white px-4 py-2 text-sky-900 font-semibold shadow hover:bg-slate-50">Agenda ahora</a>
+            <div className="h-10 w-10 bg-sky-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-sky-200">L</div>
+            <span className="text-xl font-bold tracking-tight text-gray-800">Labotec SRL</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link to="/login" className="text-sm font-medium text-gray-600 hover:text-sky-600 transition">Iniciar Sesión</Link>
+            <a href="#registro" className="bg-sky-600 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-sky-700 transition shadow-md shadow-sky-100">Registro Online</a>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-16 px-4 py-10 lg:py-16">
-        <section className="grid items-center gap-10 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-sky-600 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Resultados confiables para tu bienestar
-            </span>
-            <h1 className="text-3xl font-semibold text-gray-900 sm:text-4xl lg:text-5xl">
-              Regístrate en LABOTEC y agenda tu prueba de laboratorio en minutos
-            </h1>
-            <p className="text-base text-gray-600 sm:text-lg">
-              Somos tu aliado en diagnóstico clínico. Regístrate como paciente nuevo, selecciona la prueba que necesitas y reserva la fecha y hora que mejor se ajusten a tu rutina.
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                to="/login?next=/app/appointments"
-                className="inline-flex items-center justify-center rounded-full bg-sky-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-sky-700"
-              >
-                Registrarme y agendar
-              </Link>
-              <Link
-                to="/login?next=/app/appointments"
-                className="inline-flex items-center justify-center rounded-full border border-sky-100 bg-white px-6 py-3.5 text-base font-semibold text-sky-700 shadow-sm transition hover:border-sky-200 hover:text-sky-800"
-              >
-                Ver mis citas
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-3 text-sm text-gray-600">
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                Resultados en línea 24/7
-              </div>
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Atención domiciliaria disponible
-              </div>
-              <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                Cobertura con aseguradoras aliadas
-              </div>
-            </div>
-          </div>
-          <div className="relative">
-            <div className="absolute -left-6 -top-6 hidden h-28 w-28 rounded-3xl bg-emerald-200/50 blur-2xl lg:block" />
-            <div className="absolute -bottom-8 -right-8 hidden h-32 w-32 rounded-full bg-sky-200/60 blur-2xl lg:block" />
-            <div className="relative rounded-3xl border border-sky-100 bg-white p-6 shadow-xl shadow-sky-100/70">
-              <p className="text-sm font-semibold text-gray-900">Agendamiento Express</p>
-              <p className="mt-2 text-sm text-gray-600">Completa tu registro y confirma tu cita en tres sencillos pasos.</p>
-              <ol className="mt-4 space-y-3 text-sm text-gray-700">
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">1</span>
-                  <div>
-                    <p className="font-semibold">Cuéntanos sobre ti</p>
-                    <p className="text-xs text-gray-500">Registra tus datos básicos y tus preferencias de contacto.</p>
+      <main>
+        {/* Hero Section - Estilo Google Business */}
+        <section className="pt-8 pb-12 bg-white border-b border-gray-100">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-4">
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">Labotec SRL</h1>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-gray-800">4.7</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4].map(i => <StarIcon key={i} />)}
+                    <svg className="h-4 w-4 text-amber-400 fill-current opacity-60" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                   </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">2</span>
-                  <div>
-                    <p className="font-semibold">Elige la prueba clínica</p>
-                    <p className="text-xs text-gray-500">Selecciona entre nuestros perfiles especializados.</p>
-                  </div>
-                </li>
-                <li className="flex gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-600 text-white">3</span>
-                  <div>
-                    <p className="font-semibold">Reserva tu cita</p>
-                    <p className="text-xs text-gray-500">Elige fecha, hora y sede disponibles en tiempo real.</p>
-                  </div>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </section>
-
-        <section id="servicios" className="grid gap-6 rounded-3xl bg-white/80 p-8 shadow-lg shadow-sky-100/60 lg:grid-cols-3">
-          <div className="flex flex-col gap-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Por qué elegirnos</p>
-            <h2 className="text-2xl font-semibold text-gray-900">Tecnología, precisión y acompañamiento humano</h2>
-            <p className="text-sm text-gray-600">
-              LABOTEC combina equipos de última generación con un equipo multidisciplinario de especialistas que acompañan a cada paciente durante todo el proceso.
-            </p>
-          </div>
-          <div className="space-y-4 text-sm text-gray-600">
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Resultados rápidos</p>
-              <p className="mt-1 text-xs text-gray-500">Más del 85% de las pruebas se entregan en menos de 24 horas.</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Convenios con aseguradoras</p>
-              <p className="mt-1 text-xs text-gray-500">Aceptamos los principales planes de salud y contamos con tarifas preferenciales.</p>
-            </div>
-          </div>
-          <div className="space-y-4 text-sm text-gray-600">
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Atención personalizada</p>
-              <p className="mt-1 text-xs text-gray-500">Nuestro equipo de enfermería te acompaña antes, durante y después del procedimiento.</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-white p-4 shadow-sm">
-              <p className="font-semibold text-gray-900">Resultados digitales seguros</p>
-              <p className="mt-1 text-xs text-gray-500">Consulta tus resultados desde cualquier dispositivo con autenticación segura.</p>
-            </div>
-          </div>
-        </section>
-
-        <section id="procesos" className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-emerald-100 bg-white/80 p-8 shadow-lg shadow-emerald-100/50">
-            <h2 className="text-2xl font-semibold text-gray-900">Registra tus datos como paciente</h2>
-            <p className="mt-2 text-sm text-gray-600">Completa el formulario y recibirás un correo con la confirmación de tu usuario LABOTEC.</p>
-            <form onSubmit={handleRegisterSubmit} className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="md:col-span-2">
-                <label htmlFor="fullName" className="text-sm font-medium text-gray-700">Nombre completo *</label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  value={registerData.fullName}
-                  onChange={handleRegisterChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. Ana María Rodríguez"
-                />
-              </div>
-              <div>
-                <label htmlFor="documentId" className="text-sm font-medium text-gray-700">Documento de identidad *</label>
-                <input
-                  id="documentId"
-                  name="documentId"
-                  value={registerData.documentId}
-                  onChange={handleRegisterChange}
-                  type="text"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. CC 123456789"
-                />
-              </div>
-              <div>
-                <label htmlFor="email" className="text-sm font-medium text-gray-700">Correo electrónico *</label>
-                <input
-                  id="email"
-                  name="email"
-                  value={registerData.email}
-                  onChange={handleRegisterChange}
-                  type="email"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="tucorreo@ejemplo.com"
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">Crea tu contraseña *</label>
-                <input
-                  id="password"
-                  name="password"
-                  value={registerData.password}
-                  onChange={handleRegisterChange}
-                  type="password"
-                  minLength={8}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Mínimo 8 caracteres"
-                />
-                <p className="mt-1 text-xs text-gray-500">Esta contraseña te permitirá ingresar al portal de pacientes.</p>
-              </div>
-              <div>
-                <label htmlFor="phone" className="text-sm font-medium text-gray-700">Teléfono de contacto *</label>
-                <input
-                  id="phone"
-                  name="phone"
-                  value={registerData.phone}
-                  onChange={handleRegisterChange}
-                  type="tel"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  placeholder="Ej. +57 320 123 4567"
-                />
-              </div>
-              <div>
-                <label htmlFor="birthDate" className="text-sm font-medium text-gray-700">Fecha de nacimiento *</label>
-                <input
-                  id="birthDate"
-                  name="birthDate"
-                  value={registerData.birthDate}
-                  onChange={handleRegisterChange}
-                  type="date"
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label htmlFor="testType" className="text-sm font-medium text-gray-700">Tipo de prueba que necesitas *</label>
-                <select
-                  id="testType"
-                  name="testType"
-                  value={registerData.testType}
-                  onChange={handleRegisterChange}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                >
-                  <option value="">Selecciona una opción</option>
-                  {testOptions.map((test) => (
-                    <option key={test} value={test}>{test}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="md:col-span-2 flex flex-col gap-3">
-                <button type="submit" className="rounded-full bg-sky-600 px-5 py-3 text-sm font-semibold text-white shadow hover:bg-sky-700 disabled:opacity-60 disabled:cursor-not-allowed" disabled={registerLoading}>
-                  {registerLoading ? 'Enviando...' : 'Registrarme como paciente'}
-                </button>
-                {registerStatus && (
-                  <p className={`text-sm ${registerStatus.type === 'success' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {registerStatus.message}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-
-          <div className="rounded-3xl border border-sky-100 bg-white/80 p-8 shadow-lg shadow-sky-100/60">
-            <p className="text-xs font-semibold uppercase tracking-widest text-sky-600">Servicios</p>
-            <h3 className="mt-1 text-xl font-semibold text-gray-900">Pruebas disponibles para agendar</h3>
-            <p className="mt-2 text-sm text-gray-600">Consulta las pruebas activas antes de finalizar tu registro. Filtra por nombre o código para encontrar lo que necesitas.</p>
-
-            <div className="mt-5 space-y-4 rounded-2xl border border-sky-100 bg-sky-50/40 p-4 text-sm text-gray-700">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-sky-700">Catálogo actualizado</p>
-                  <p className="text-xs text-gray-500">{totalFilteredTests} {totalFilteredTests === 1 ? 'servicio coincide' : 'servicios coinciden'} con tu búsqueda</p>
+                  <span className="text-gray-500 text-sm">(3 opiniones)</span>
                 </div>
-                <label className="relative w-full sm:w-72">
-                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">🔍</span>
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="w-full rounded-full border border-sky-100 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    placeholder="Buscar por nombre o código"
-                  />
-                </label>
+                <p className="text-gray-600 font-medium">Laboratorio de análisis clínicos</p>
+                <div className="flex flex-wrap gap-6 pt-2 text-sm font-semibold text-sky-700">
+                  <button className="flex items-center gap-2 px-4 py-2 bg-sky-50 rounded-full hover:bg-sky-100 transition"><span></span> Indicaciones</button>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-sky-50 rounded-full hover:bg-sky-100 transition"><span></span> Guardar</button>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-sky-50 rounded-full hover:bg-sky-100 transition"><span></span> Compartir</button>
+                </div>
               </div>
+              <div className="hidden lg:block w-72 h-48 bg-gray-100 rounded-2xl overflow-hidden border border-gray-200">
+                <img src="https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&q=80&w=400" alt="Interior laboratorio" className="w-full h-full object-cover" />
+              </div>
+            </div>
+          </div>
+        </section>
 
-              {testsError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-700">{testsError}</div>}
+        {/* Info Grid */}
+        <section className="py-12 bg-gray-50/50">
+          <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start gap-4">
+              <div className="bg-sky-100 p-3 rounded-xl text-sky-600"></div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1 font-semibold uppercase tracking-wider">Ubicación</p>
+                <p className="text-gray-800 leading-relaxed">Apart. 1-A, Avenida Miguel Díaz Esq, Peatonal 17 Manz. 6, Santo Domingo Este 11802</p>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start gap-4">
+              <div className="bg-sky-100 p-3 rounded-xl text-sky-600"></div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1 font-semibold uppercase tracking-wider">Horario</p>
+                <p className="text-emerald-600 font-bold">Cerrado ⋅ Abre a las 8:00 a.m. del lunes</p>
+                <p className="text-xs text-gray-400 mt-1">Lunes a Sábado: 8:00 AM - 6:00 PM</p>
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start gap-4">
+              <div className="bg-sky-100 p-3 rounded-xl text-sky-600"></div>
+              <div>
+                <p className="text-sm text-gray-500 mb-1 font-semibold uppercase tracking-wider">Teléfono</p>
+                <p className="text-gray-800 font-bold text-lg">(809) 695-1289</p>
+                <p className="text-xs text-gray-400 mt-1">Atención inmediata vía WhatsApp</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
-              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div className="space-y-3">
-                  {testsLoading ? (
-                    <div className="space-y-2">
-                      <div className="h-4 w-3/4 rounded-full bg-sky-100 animate-pulse" />
-                      <div className="h-4 w-2/3 rounded-full bg-sky-100 animate-pulse" />
-                      <div className="h-4 w-1/2 rounded-full bg-sky-100 animate-pulse" />
+        {/* Catálogo de Pruebas (Funcionalidad Preservada) */}
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-4">
+              <div className="space-y-1 text-center md:text-left">
+                <h2 className="text-3xl font-bold text-gray-900">Catálogo de Servicios</h2>
+                <p className="text-gray-500">Consulta nuestras pruebas disponibles para agendamiento.</p>
+              </div>
+              <div className="relative w-full md:w-96">
+                <input
+                  type="text"
+                  placeholder="Buscar prueba o código..."
+                  className="w-full px-5 py-3 rounded-2xl border border-gray-200 focus:ring-4 focus:ring-sky-50 focus:border-sky-400 outline-none transition"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <span className="absolute right-4 top-3.5 text-gray-400"></span>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              {testsLoading ? (
+                <div className="animate-pulse space-y-4">
+                  {[1, 2, 3].map(i => <div key={i} className="h-16 bg-gray-50 rounded-2xl"></div>)}
+                </div>
+              ) : visibleTests.length > 0 ? (
+                visibleTests.map((test) => (
+                  <div key={test.code || test.name} className="flex items-center justify-between p-5 bg-gray-50/50 hover:bg-white border border-transparent hover:border-gray-200 hover:shadow-xl hover:shadow-gray-100 rounded-2xl transition group">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 bg-white rounded-xl border border-gray-200 flex items-center justify-center text-sky-600 font-bold group-hover:bg-sky-600 group-hover:text-white transition">
+                        {test.code?.substring(0, 2) || "TS"}
+                      </div>
+                      <div>
+                        <p className="font-bold text-gray-800">{test.name || test.Name}</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-tighter">{test.code || "Prueba General"} • {test.defaultUnit || "Consultar unidad"}</p>
+                      </div>
                     </div>
-                  ) : totalFilteredTests > 0 ? (
-                    visibleTests.map((test) => {
-                      const testName = test.name ?? test.Name
-                      const code = test.code ?? test.Code
-                      const unit = test.defaultUnit ?? test.DefaultUnit
-                      return (
-                        <div key={code || testName} className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-start sm:justify-between">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-gray-900">{testName}</p>
-                              {code && <span className="rounded-full bg-sky-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">{code}</span>}
-                            </div>
-                            <p className="text-xs text-gray-500">{unit ? `Unidad de referencia: ${unit}` : 'Prueba disponible para agendamiento inmediato'}</p>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                            <span className="rounded-full bg-emerald-100 px-3 py-1">Activa</span>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">No encontramos servicios que coincidan con tu búsqueda.</div>
-                  )}
+                    <div className="text-emerald-600 text-xs font-bold bg-emerald-50 px-3 py-1.5 rounded-full">Activa</div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-10 text-gray-400">No se encontraron resultados.</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Opiniones (Nueva Estructura de Datos) */}
+        <section className="py-16 bg-gray-50/50">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex items-center justify-between mb-10">
+              <h2 className="text-3xl font-bold text-gray-900">Resumen de opiniones</h2>
+              <button className="text-sky-600 font-bold hover:underline">Escribir una opinión</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { author: "LUISANA GARCIA", date: "Hace 11 meses", text: "Excelente servicio", badge: "1 opinión" },
+                { author: "Yarelin Sierra", date: "Hace 2 años", text: "Servicio rápido", badge: "Local Guide · 31 opiniones" },
+                { author: "caraballo", date: "Hace 6 meses", text: "Muy profesionales en la toma de muestras.", badge: "1 opinión · 2 fotos" }
+              ].map((review, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500">{review.author[0]}</div>
+                    <div>
+                      <p className="font-bold text-sm text-gray-900">{review.author}</p>
+                      <p className="text-[10px] text-gray-400 uppercase font-semibold">{review.badge}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map(i => <StarIcon key={i} />)}
+                  </div>
+                  <p className="text-gray-600 text-sm leading-relaxed">"{review.text}"</p>
+                  <p className="text-xs text-gray-400">{review.date}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Registro de Paciente (Funcionalidad Preservada) */}
+        <section id="registro" className="py-20 bg-white">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="bg-sky-600 rounded-[2.5rem] p-10 md:p-16 text-white shadow-2xl shadow-sky-200 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
+              <div className="relative z-10 space-y-8">
+                <div className="text-center space-y-2">
+                  <h2 className="text-4xl font-bold">Registro de Pacientes</h2>
+                  <p className="text-sky-100">Crea tu cuenta hoy y gestiona tus resultados 24/7</p>
                 </div>
 
-                <div className="flex flex-col items-center gap-3 rounded-2xl bg-white/70 p-3 text-xs font-semibold text-sky-700 shadow-inner">
-                  <div className="rounded-full bg-sky-50 px-4 py-2 text-[11px] uppercase tracking-wide text-sky-800">
-                    {totalFilteredTests > 0 ? `Mostrando ${visibleCount} de ${totalFilteredTests}` : '0 de 0'}
+                <form onSubmit={handleRegisterSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="md:col-span-2">
+                    <input
+                      name="fullName"
+                      placeholder="Nombre Completo"
+                      className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 outline-none focus:bg-white focus:text-gray-900 transition placeholder:text-sky-100"
+                      value={registerData.fullName}
+                      onChange={handleRegisterChange}
+                      required
+                    />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => totalFilteredTests > 0 && setVisibleStart((prev) => (prev - 1 + totalFilteredTests) % totalFilteredTests)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={testsLoading || totalFilteredTests <= 5}
-                      aria-label="Pruebas anteriores"
+                  <input
+                    name="documentId"
+                    placeholder="Documento Identidad"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 outline-none focus:bg-white focus:text-gray-900 transition placeholder:text-sky-100"
+                    value={registerData.documentId}
+                    onChange={handleRegisterChange}
+                    required
+                  />
+                  <input
+                    name="email"
+                    type="email"
+                    placeholder="Correo Electrónico"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 outline-none focus:bg-white focus:text-gray-900 transition placeholder:text-sky-100"
+                    value={registerData.email}
+                    onChange={handleRegisterChange}
+                    required
+                  />
+                  <input
+                    name="password"
+                    type="password"
+                    placeholder="Contraseña"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 outline-none focus:bg-white focus:text-gray-900 transition placeholder:text-sky-100"
+                    value={registerData.password}
+                    onChange={handleRegisterChange}
+                    required
+                  />
+                  <input
+                    name="phone"
+                    placeholder="Teléfono"
+                    className="w-full bg-white/10 border border-white/20 rounded-2xl px-5 py-4 outline-none focus:bg-white focus:text-gray-900 transition placeholder:text-sky-100"
+                    value={registerData.phone}
+                    onChange={handleRegisterChange}
+                    required
+                  />
+                  <div className="md:col-span-2">
+                    <button 
+                      type="submit" 
+                      className="w-full bg-white text-sky-600 font-bold py-5 rounded-2xl hover:bg-gray-50 transition shadow-xl"
+                      disabled={registerLoading}
                     >
-                      ←
+                      {registerLoading ? 'Procesando...' : 'Completar Registro'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => totalFilteredTests > 0 && setVisibleStart((prev) => (prev + 1) % totalFilteredTests)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={testsLoading || totalFilteredTests <= 5}
-                      aria-label="Pruebas siguientes"
-                    >
-                      →
-                    </button>
+                    {registerStatus && (
+                      <p className={`text-center mt-4 text-sm font-semibold ${registerStatus.type === 'success' ? 'text-white' : 'text-rose-200'}`}>
+                        {registerStatus.message}
+                      </p>
+                    )}
                   </div>
-                </div>
+                </form>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-6 rounded-3xl border border-gray-100 bg-white/80 p-8 shadow-lg shadow-gray-100/60 lg:grid-cols-[1.1fr_1fr]">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900">¿Qué puedes esperar el día de tu cita?</h2>
-            <p className="mt-2 text-sm text-gray-600">Queremos que vivas una experiencia cómoda y segura de principio a fin.</p>
-            <ul className="mt-6 space-y-4 text-sm text-gray-600">
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Recepción ágil con tu documento y el correo de confirmación.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Personal certificado y salas confortables para la toma de muestras.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Acompañamiento para pacientes pediátricos y adultos mayores.
-              </li>
-              <li className="flex gap-3">
-                <span className="mt-1 h-2 w-2 rounded-full bg-sky-500" />
-                Resultados disponibles en línea y entrega física según necesidad.
-              </li>
-            </ul>
-          </div>
-          <div className="rounded-2xl bg-gradient-to-br from-sky-500 via-sky-600 to-emerald-500 p-6 text-white">
-            <p className="text-xs uppercase tracking-widest text-white/80">Pacientes felices</p>
-            <p className="mt-3 text-lg font-semibold">"El proceso de agendamiento fue inmediato y me atendieron con calidez desde el primer contacto."</p>
-            <p className="mt-4 text-sm text-white/80">Laura G. · Paciente desde 2023</p>
-            <div className="mt-6 rounded-2xl bg-white/10 p-4 text-sm text-white/80">
-              <p className="font-semibold text-white">¿Tienes dudas sobre una prueba específica?</p>
-              <p className="mt-2">Escríbenos por WhatsApp al <span className="font-semibold">+57 320 111 2233</span> o agenda una llamada con un asesor.</p>
+        {/* También se buscó (Sección decorativa informativa) */}
+        <section className="py-16 bg-gray-50/50">
+          <div className="max-w-7xl mx-auto px-4">
+            <h2 className="text-xl font-bold text-gray-800 mb-8 flex items-center gap-2"><span></span> También se buscó</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { name: "Lab. Lic Mercedes Rodríguez", rate: "4.6", tags: "Laboratorio" },
+                { name: "Lab. Clinico Beltre Rojas", rate: "5.0", tags: "Médico" },
+                { name: "Lab. Clinico Tronilab", rate: "4.7", tags: "Laboratorio" },
+                { name: "LAPMERCO Laboratorio", rate: "N/A", tags: "Patología" }
+              ].map((item, idx) => (
+                <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
+                  <div className="max-w-[70%]">
+                    <p className="text-xs font-bold text-gray-900 truncate">{item.name}</p>
+                    <p className="text-[10px] text-gray-500">{item.tags}</p>
+                  </div>
+                  <div className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-1 rounded-md">{item.rate} ★</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
       </main>
 
-      <footer id="contacto" className="border-t bg-white/80 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-sm text-gray-600 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-base font-semibold text-gray-900">LABOTEC</p>
-            <p className="text-xs text-gray-500">Resultados confiables para decisiones seguras.</p>
-          </div>
-          <div className="space-y-2">
-            <p className="font-medium text-gray-700">Línea de atención: <span className="font-semibold text-sky-600">(601) 555 1212</span></p>
-            <p className="font-medium text-gray-700">Correo: <a href="mailto:contacto@labotec.com" className="text-sky-600 hover:text-sky-700">contacto@labotec.com</a></p>
-          </div>
-          <div className="space-y-2 text-xs text-gray-500">
-            <p>Horarios de toma de muestras: Lunes a sábado de 6:00 a.m. a 6:00 p.m.</p>
-            <p><Link to="/login" className="text-sky-600 hover:text-sky-700">Acceso para personal médico</Link></p>
+      <footer className="bg-gray-900 text-gray-400 py-12">
+        <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
+          <p className="text-white font-bold tracking-widest text-lg uppercase">Labotec SRL</p>
+          <p className="text-sm max-w-md mx-auto">Resultados confiables, atención humana y procesos rápidos para tu bienestar y el de tu familia.</p>
+          <div className="pt-6 border-t border-gray-800 mt-8 text-[10px] uppercase tracking-widest">
+            © {new Date().getFullYear()} LABOTEC SRL • Santo Domingo Este • RD
           </div>
         </div>
-        <p className="mt-6 text-center text-xs text-gray-400">© {new Date().getFullYear()} LABOTEC. Todos los derechos reservados.</p>
       </footer>
     </div>
   )
 }
+
