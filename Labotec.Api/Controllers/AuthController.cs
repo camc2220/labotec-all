@@ -21,6 +21,12 @@ namespace Labotec.Api.Controllers
         private readonly JwtTokenService _jwt;
         private readonly AppDbContext _db;
 
+        private static string DeriveUserNameFromEmail(string email)
+        {
+            var atIndex = email.IndexOf('@');
+            return atIndex > 0 ? email[..atIndex] : email;
+        }
+
         public AuthController(
             UserManager<IdentityUser> userManager,
             SignInManager<IdentityUser> signInManager,
@@ -40,10 +46,28 @@ namespace Labotec.Api.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
+            var email = dto.Email?.Trim();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest("El correo electrónico es obligatorio.");
+            }
+
+            var derivedUserName = DeriveUserNameFromEmail(email);
+            if (string.IsNullOrWhiteSpace(derivedUserName))
+            {
+                return BadRequest("No se pudo generar un nombre de usuario a partir del correo.");
+            }
+
+            var existingUser = await _userManager.FindByNameAsync(derivedUserName);
+            if (existingUser is not null)
+            {
+                return BadRequest($"Ya existe un usuario con el nombre {derivedUserName}.");
+            }
+
             var user = new IdentityUser
             {
-                UserName = dto.UserName,
-                Email = dto.Email
+                UserName = derivedUserName,
+                Email = email
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);
@@ -58,7 +82,7 @@ namespace Labotec.Api.Controllers
                 FullName = dto.FullName,
                 DocumentId = dto.DocumentId,
                 BirthDate = dto.BirthDate,
-                Email = dto.Email,
+                Email = email,
                 Phone = dto.Phone,
                 UserId = user.Id
             };
@@ -163,6 +187,12 @@ namespace Labotec.Api.Controllers
         private readonly JwtTokenService _jwt;
         private readonly AppDbContext _db;
 
+        private static string DeriveUserNameFromEmail(string email)
+        {
+            var atIndex = email.IndexOf('@');
+            return atIndex > 0 ? email[..atIndex] : email;
+        }
+
         public AuthController(
             UserManager<IdentityUser> userManager,
             SignInManager<IdentityUser> signInManager,
@@ -197,10 +227,28 @@ namespace Labotec.Api.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
+            var email = dto.Email?.Trim();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest("El correo electrónico es obligatorio.");
+            }
+
+            var derivedUserName = DeriveUserNameFromEmail(email);
+            if (string.IsNullOrWhiteSpace(derivedUserName))
+            {
+                return BadRequest("No se pudo generar un nombre de usuario a partir del correo.");
+            }
+
+            var existingUser = await _userManager.FindByNameAsync(derivedUserName);
+            if (existingUser is not null)
+            {
+                return BadRequest($"Ya existe un usuario con el nombre {derivedUserName}.");
+            }
+
             var user = new IdentityUser
             {
-                UserName = dto.UserName,
-                Email = dto.Email
+                UserName = derivedUserName,
+                Email = email
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);
@@ -215,7 +263,7 @@ namespace Labotec.Api.Controllers
                 FullName = dto.FullName,
                 DocumentId = dto.DocumentId,
                 BirthDate = dto.BirthDate,
-                Email = dto.Email,
+                Email = email,
                 Phone = dto.Phone,
                 UserId = user.Id
             };
