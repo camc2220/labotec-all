@@ -53,6 +53,7 @@ export default function Invoices() {
 
   const isPatient = user?.role === 'patient'
   const canManage = user?.isAdmin || user?.isFacturacion
+  const displayUserName = user?.name ?? 'Usuario'
   const endpoint = isPatient ? '/api/patients/me/invoices' : '/api/invoices'
 
   const fetchData = async () => {
@@ -299,6 +300,23 @@ export default function Invoices() {
 
   const printRows = rows => {
     if (!rows || rows.length === 0) return
+    const singlePatient = rows.every(row => getPatientKey(row) === getPatientKey(rows[0]))
+    const patientLabel = isPatient
+      ? 'Mi cuenta'
+      : singlePatient
+        ? rows[0]?.patientName ?? rows[0]?.patientId ?? 'Paciente sin nombre'
+        : 'Varios pacientes'
+    const totalInvoices = rows.length
+    const totalAmount = rows.reduce((sum, row) => sum + Number(row.amount ?? row.Amount ?? 0), 0)
+    const paidCount = rows.filter(row => Boolean(row.paid)).length
+    const pendingCount = Math.max(totalInvoices - paidCount, 0)
+    const latestIssueDate = rows.reduce((latest, row) => {
+      const issued = row.issuedAt ? new Date(row.issuedAt) : null
+      if (!issued || Number.isNaN(issued.getTime())) return latest
+      if (!latest) return issued
+      return issued > latest ? issued : latest
+    }, null)
+
     const title = isPatient
       ? 'Mis facturas'
       : rows.every(row => getPatientKey(row) === getPatientKey(rows[0]))
@@ -306,7 +324,7 @@ export default function Invoices() {
         : 'Facturas de pacientes'
     printRecords({
       title,
-      subtitle: 'Listado generado desde Labotec',
+      subtitle: `Listado generado por ${displayUserName}`,
       columns: [
         ...(isPatient
           ? []
@@ -316,6 +334,14 @@ export default function Invoices() {
         { header: 'Fecha', accessor: row => (row.issuedAt ? formatDate(row.issuedAt) : '') },
         { header: 'Pagada', accessor: row => (row.paid ? 'Sí' : 'No') },
       ],
+      info: [
+        { label: 'Paciente', value: patientLabel },
+        { label: 'Total de facturas', value: `${totalInvoices} registro${totalInvoices === 1 ? '' : 's'}` },
+        { label: 'Monto total', value: `RD$ ${formatMoney(totalAmount)}` },
+        { label: 'Pagadas / pendientes', value: `${paidCount} / ${pendingCount}` },
+        latestIssueDate ? { label: 'Última emisión', value: formatDate(latestIssueDate) } : null,
+      ].filter(Boolean),
+      footerNote: 'Gracias por confiar en Labotec. Si necesitas soporte sobre tus pagos o facturas, contáctanos con este listado.',
       rows,
     })
   }
