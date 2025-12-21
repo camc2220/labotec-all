@@ -11,7 +11,7 @@ export function printRecords({
   columns = [],
   rows = [],
   info = [],
-  brandName = 'Labotec',
+  brandName = 'Labotec SRL',
   footerNote = '',
 }) {
   if (typeof window === 'undefined') return
@@ -20,7 +20,7 @@ export function printRecords({
     return
   }
 
-  const printWindow = window.open('', '', 'width=900,height=650')
+  const printWindow = window.open('', '', 'width=1000,height=800')
   if (!printWindow) {
     window.alert('No pudimos abrir la ventana de impresión. Revisa que el navegador no bloquee ventanas emergentes.')
     return
@@ -35,187 +35,280 @@ export function printRecords({
           return `<td>${escapeHtml(value ?? '')}</td>`
         })
         .join('')
-      return `<tr><td>${index + 1}</td>${cells}</tr>`
+      return `<tr><td class="index-cell">${index + 1}</td>${cells}</tr>`
     })
     .join('')
 
-  const generatedAt = new Date().toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
-  const infoItems = (info ?? [])
+  const generatedAt = new Date().toLocaleString('es-DO', { dateStyle: 'long', timeStyle: 'short' })
+  
+  const infoSection = (info ?? [])
     .filter(item => item && item.label && item.value)
     .map(item => `
-      <div class="info-item">
+      <div class="info-group">
         <div class="info-label">${escapeHtml(item.label)}</div>
         <div class="info-value">${escapeHtml(item.value)}</div>
       </div>
     `)
     .join('')
 
-  printWindow.document.write(`<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(title)}</title>
-  <style>
-    body {
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 24px;
-      background: #0b172a;
-      color: #0f172a;
-    }
-    .sheet {
-      max-width: 960px;
-      margin: 0 auto;
-      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 45%, #e0f2fe 100%);
-      border-radius: 18px;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-      padding: 28px;
-      border: 1px solid rgba(14, 116, 144, 0.12);
-    }
-    .header {
-      margin-bottom: 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-    .brand-mark {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 64px;
-      height: 64px;
-      border-radius: 16px;
-      background: linear-gradient(145deg, #0ea5e9 0%, #0f172a 70%);
-      color: white;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      font-size: 18px;
-      text-transform: uppercase;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      box-shadow: 0 10px 30px rgba(14, 165, 233, 0.35);
-    }
-    h1 {
-      margin: 2px 0;
-      font-size: 26px;
-      color: #0f172a;
-    }
-    .brand-tagline {
-      margin: 0;
-      font-size: 12px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #0ea5e9;
-      font-weight: 700;
-    }
-    .subtitle, .generated {
-      margin: 4px 0;
-      font-size: 14px;
-      color: #475569;
-    }
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin: 22px 0 14px;
-    }
-    .info-item {
-      background: rgba(255, 255, 255, 0.75);
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      border-radius: 12px;
-      padding: 10px 12px;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-    }
-    .info-label {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #0ea5e9;
-      margin-bottom: 2px;
-      font-weight: 700;
-    }
-    .info-value {
-      font-size: 15px;
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .table-card {
-      background: white;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-      background: white;
-    }
-    th, td {
-      border: 1px solid #e2e8f0;
-      padding: 10px 12px;
-      text-align: left;
-      font-size: 14px;
-    }
-    thead {
-      background: linear-gradient(90deg, #0ea5e9, #22d3ee);
-      color: #0f172a;
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    tbody tr:nth-child(even) {
-      background: #f8fafc;
-    }
-    tbody tr:hover {
-      background: #ecfeff;
-    }
-    .footer-note {
-      margin-top: 16px;
-      font-size: 13px;
-      color: #334155;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 12px;
-      border: 1px dashed rgba(14, 165, 233, 0.4);
-    }
-  </style>
-</head>
-<body>
-  <div class="sheet">
-    <div class="header">
-      <div class="brand">
-        <div class="brand-mark">${escapeHtml(brandName)}</div>
-        <div>
-          <p class="brand-tagline">Resultados confiables y oportunos</p>
-          <h1>${escapeHtml(title)}</h1>
-          ${subtitle ? `<p class="subtitle">${escapeHtml(subtitle)}</p>` : ''}
-          <p class="generated">Generado el ${escapeHtml(generatedAt)}</p>
-        </div>
-      </div>
-    </div>
-    ${infoItems ? `<section class="info-grid">${infoItems}</section>` : ''}
-    <div class="table-card">
-      <table>
-        <thead>
-          <tr><th>#</th>${headerCells}</tr>
-        </thead>
-        <tbody>
-          ${bodyRows}
-        </tbody>
-      </table>
-    </div>
-    ${footerNote ? `<p class="footer-note">${escapeHtml(footerNote)}</p>` : ''}
-  </div>
-</body>
-</html>`)
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8" />
+      <title>${escapeHtml(title)} - ${escapeHtml(brandName)}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+      <style>
+        :root {
+          --primary: #0284c7; /* sky-600 */
+          --primary-dark: #0369a1; /* sky-700 */
+          --text-main: #0f172a; /* slate-900 */
+          --text-muted: #64748b; /* slate-500 */
+          --border: #e2e8f0; /* slate-200 */
+          --bg-header: #f8fafc; /* slate-50 */
+          --bg-row-alt: #f1f5f9; /* slate-100 */
+        }
+        
+        *, *::before, *::after {
+          box-sizing: border-box;
+        }
 
+        body {
+          font-family: 'Inter', sans-serif;
+          margin: 0;
+          background-color: #fff;
+          color: var(--text-main);
+          font-size: 12px;
+          line-height: 1.5;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+        .page-container {
+          max-width: 210mm; /* A4 width */
+          margin: 0 auto;
+          padding: 40px;
+        }
+
+        /* Print Specifics */
+        @media print {
+          @page {
+            margin: 1.5cm;
+            size: auto;
+          }
+          body {
+            background: none;
+            margin: 0;
+          }
+          .page-container {
+            width: 100%;
+            max-width: none;
+            padding: 0;
+            margin: 0;
+          }
+        }
+
+        /* Header */
+        .doc-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          border-bottom: 2px solid var(--primary);
+          padding-bottom: 16px;
+          margin-bottom: 24px;
+        }
+
+        .brand-section {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .brand-logo {
+          font-size: 20px;
+          font-weight: 800;
+          color: var(--primary);
+          text-transform: uppercase;
+          letter-spacing: -0.5px;
+          margin-bottom: 2px;
+        }
+
+        .brand-subtitle {
+          color: var(--text-muted);
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 1.5px;
+          font-weight: 600;
+        }
+
+        .doc-meta {
+          text-align: right;
+        }
+
+        .doc-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text-main);
+          margin: 0;
+          text-transform: uppercase;
+        }
+
+        .doc-date {
+          color: var(--text-muted);
+          font-size: 10px;
+          margin-top: 4px;
+        }
+
+        /* Info Grid */
+        .info-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+          margin-bottom: 24px;
+          background-color: var(--bg-header);
+          padding: 12px 16px;
+          border-radius: 6px;
+          border: 1px solid var(--border);
+        }
+
+        .info-group {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .info-label {
+          font-size: 9px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: var(--text-muted);
+          font-weight: 700;
+          margin-bottom: 2px;
+        }
+
+        .info-value {
+          font-size: 11px;
+          font-weight: 500;
+          color: var(--text-main);
+        }
+
+        /* Table */
+        .data-table-container {
+          margin-bottom: 30px;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 10px;
+        }
+
+        th {
+          background-color: var(--bg-header);
+          color: var(--text-muted);
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 8px 10px;
+          text-align: left;
+          border-bottom: 1px solid var(--border);
+          border-top: 1px solid var(--border);
+        }
+
+        td {
+          padding: 8px 10px;
+          border-bottom: 1px solid var(--border);
+          color: var(--text-main);
+          vertical-align: top;
+        }
+
+        .index-cell {
+          width: 30px;
+          text-align: center;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        /* Zebra Striping */
+        tbody tr:nth-child(even) {
+          background-color: var(--bg-row-alt);
+        }
+
+        /* Footer */
+        .doc-footer {
+          margin-top: 40px;
+          padding-top: 16px;
+          border-top: 1px solid var(--border);
+          text-align: center;
+        }
+
+        .footer-note {
+          font-size: 9px;
+          color: var(--text-muted);
+          margin-bottom: 4px;
+          font-style: italic;
+        }
+        
+        .footer-brand {
+          font-size: 9px;
+          font-weight: 600;
+          color: var(--primary);
+        }
+
+      </style>
+    </head>
+    <body>
+      <div class="page-container">
+        
+        <header class="doc-header">
+          <div class="brand-section">
+            <div class="brand-logo">${escapeHtml(brandName)}</div>
+            <div class="brand-subtitle">Laboratorio Clínico</div>
+          </div>
+          <div class="doc-meta">
+            <h1 class="doc-title">${escapeHtml(title)}</h1>
+            <div class="doc-date">${escapeHtml(generatedAt)}</div>
+            ${subtitle ? `<div class="doc-date" style="font-weight:500">${escapeHtml(subtitle)}</div>` : ''}
+          </div>
+        </header>
+
+        ${infoSection ? `<section class="info-grid">${infoSection}</section>` : ''}
+
+        <div class="data-table-container">
+          <table>
+            <thead>
+              <tr>
+                <th class="index-cell">#</th>
+                ${headerCells}
+              </tr>
+            </thead>
+            <tbody>
+              ${bodyRows}
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="doc-footer">
+          ${footerNote ? `<p class="footer-note">${escapeHtml(footerNote)}</p>` : ''}
+          <div class="footer-brand">
+             Labotec SRL - Avenida Miguel Díaz, Santo Domingo Este - Tel: (809) 695-1289
+          </div>
+        </footer>
+
+      </div>
+    </body>
+    </html>
+  `
+
+  printWindow.document.write(htmlContent)
   printWindow.document.close()
-  printWindow.focus()
-  printWindow.print()
+  
+  // Wait for resources to load (like fonts) before printing
+  printWindow.onload = () => {
+    printWindow.focus()
+    // Small delay to ensure styles render correctly
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
+  }
 }
