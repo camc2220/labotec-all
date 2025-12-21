@@ -29,7 +29,8 @@ export default function Appointments() {
   const [availability, setAvailability] = useState([])
   const [availabilityLoading, setAvailabilityLoading] = useState(false)
   const [availabilityError, setAvailabilityError] = useState('')
-  const [availabilityForm, setAvailabilityForm] = useState({ id: null, day: '', time: '', slots: '' })
+  const defaultSlotsPerHour = 5
+  const [availabilityForm, setAvailabilityForm] = useState({ id: null, day: '', time: '', slots: defaultSlotsPerHour })
   const [availabilitySaving, setAvailabilitySaving] = useState(false)
   const [formData, setFormData] = useState({
     patientId: '',
@@ -70,8 +71,8 @@ export default function Appointments() {
   }, [endpoint, user])
 
   useEffect(() => {
-    if (user && isAdmin) fetchAvailability()
-  }, [isAdmin, user])
+    if (user) fetchAvailability()
+  }, [user])
 
   const openForm = item => {
     if (item) {
@@ -108,6 +109,20 @@ export default function Appointments() {
     setSaving(true)
     setFormError('')
     try {
+      const { day, time } = extractDayTimeFromDateTime(formData.scheduledAt)
+      if (!day || !time) {
+        setFormError('Debes seleccionar fecha y hora válidas.')
+        return
+      }
+
+      const currentId = editingItem ? resolveEntityId(editingItem) : null
+      const remainingSlots = getRemainingSlots(day, time, currentId)
+
+      if (remainingSlots <= 0) {
+        setFormError('No hay cupos disponibles para el horario seleccionado. Elige otra hora.')
+        return
+      }
+
       const payload = {
         scheduledAt: formData.scheduledAt,
         type: formData.type,
@@ -166,9 +181,25 @@ export default function Appointments() {
     }
   }
 
+  const normalizeTime = value => (value ? value.slice(0, 5) : '')
+
+  const normalizeDay = value => {
+    if (!value) return ''
+    if (value.includes('T')) {
+      return value.split('T')[0]
+    }
+    return value
+  }
+
+  const extractDayTimeFromDateTime = value => {
+    if (!value) return { day: '', time: '' }
+    const [dayPart, timePart] = value.split('T')
+    return { day: dayPart || '', time: normalizeTime(timePart || '') }
+  }
+
   const normalizeAvailabilityPayload = form => ({
     day: form.day,
-    time: form.time,
+    time: normalizeTime(form.time),
     slots: Number(form.slots) || 0,
   })
 
@@ -193,7 +224,7 @@ export default function Appointments() {
         await api.post(resourceUrl, payload)
       }
 
-      setAvailabilityForm({ id: null, day: '', time: '', slots: '' })
+      setAvailabilityForm({ id: null, day: '', time: '', slots: defaultSlotsPerHour })
       fetchAvailability()
     } catch (err) {
       console.error(err)
@@ -208,14 +239,36 @@ export default function Appointments() {
   const handleAvailabilityEdit = slot => {
     setAvailabilityForm({
       id: resolveEntityId(slot),
-      day: slot.day || slot.date || slot.scheduledDay || slot.dateTime?.split('T')[0] || '',
-      time:
-        slot.time ||
-        slot.hour ||
-        slot.scheduledTime ||
-        (slot.dateTime?.split('T')[1]?.slice(0, 5) ?? ''),
-      slots: slot.slots ?? slot.availableSlots ?? slot.capacity ?? '',
+      day: normalizeDay(slot.day || slot.date || slot.scheduledDay || slot.dateTime) || '',
+      time: normalizeTime(slot.time || slot.hour || slot.scheduledTime || slot.dateTime) || '',
+      slots: slot.slots ?? slot.availableSlots ?? slot.capacity ?? defaultSlotsPerHour,
     })
+  }
+
+  const getCapacityForSlot = (day, time) => {
+    if (!day || !time) return defaultSlotsPerHour
+    const slot = availability.find(
+      entry => normalizeDay(entry.day || entry.date || entry.scheduledDay || entry.dateTime) === day &&
+        normalizeTime(entry.time || entry.hour || entry.scheduledTime || entry.dateTime) === time,
+    )
+
+    const rawSlots = slot?.slots ?? slot?.availableSlots ?? slot?.capacity
+    const parsedSlots = rawSlots === undefined ? undefined : Number(rawSlots)
+    if (Number.isFinite(parsedSlots)) return parsedSlots
+    return defaultSlotsPerHour
+  }
+
+  const getBookedCount = (day, time, excludeId) =>
+    items.filter(item => {
+      const { day: itemDay, time: itemTime } = extractDayTimeFromDateTime(item.scheduledAt)
+      if (excludeId && resolveEntityId(item) === excludeId) return false
+      return itemDay === day && itemTime === time
+    }).length
+
+  const getRemainingSlots = (day, time, excludeId) => {
+    const capacity = getCapacityForSlot(day, time)
+    const booked = getBookedCount(day, time, excludeId)
+    return Math.max(capacity - booked, 0)
   }
 
   const formatDate = value => {
@@ -268,6 +321,14 @@ export default function Appointments() {
     [isPatient],
   )
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
+
+  const currentSlot = extractDayTimeFromDateTime(formData.scheduledAt)
+  const currentRemainingSlots = getRemainingSlots(
+    currentSlot.day,
+    currentSlot.time,
+    editingItem ? resolveEntityId(editingItem) : null,
+  )
+  const currentCapacity = getCapacityForSlot(currentSlot.day, currentSlot.time)
 
   return (
     <section className="space-y-4">
@@ -347,14 +408,14 @@ export default function Appointments() {
               />
             </div>
             <div className="flex items-end justify-end gap-2">
-              {availabilityForm.id && (
-                <button
-                  type="button"
-                  onClick={() => setAvailabilityForm({ id: null, day: '', time: '', slots: '' })}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-50"
-                >
-                  Cancelar edición
-                </button>
+                {availabilityForm.id && (
+                  <button
+                    type="button"
+                    onClick={() => setAvailabilityForm({ id: null, day: '', time: '', slots: defaultSlotsPerHour })}
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-50"
+                  >
+                    Cancelar edición
+                  </button>
               )}
               <button
                 type="submit"
@@ -432,6 +493,9 @@ export default function Appointments() {
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 required
               />
+              <p className="mt-1 text-xs text-gray-600">
+                Cupo base por hora: {currentCapacity}. Cupos restantes para este horario: {currentRemainingSlots}.
+              </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
