@@ -18,4 +18,4 @@ public record PatientReadDto(
     string? Phone,
     string? UserId);
 
-public record PatientUpdateDto(string FullName, DateTime? BirthDate, string? Email, string? Phone);
+public record PatientUpdateDto(string FullName, string DocumentId, DateTime? BirthDate, string? Email, string? Phone);

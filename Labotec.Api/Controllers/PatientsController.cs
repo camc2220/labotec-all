@@ -190,7 +190,14 @@ public class PatientsController : ControllerBase
         var currentPatientId = User.GetPatientId();
         if (currentPatientId.HasValue && p.Id != currentPatientId.Value) return Forbid();
 
+        var documentId = dto.DocumentId?.Trim();
+        if (!IsValidDocumentId(documentId))
+        {
+            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
+        }
+
         p.FullName = dto.FullName;
+        p.DocumentId = documentId!;
         p.BirthDate = dto.BirthDate;
         p.Email = dto.Email;
         p.Phone = dto.Phone;
@@ -477,7 +484,14 @@ public class PatientsController : ControllerBase
             if (p.Id != currentPatientId.Value) return Forbid();
         }
 
+        var documentId = dto.DocumentId?.Trim();
+        if (!IsValidDocumentId(documentId))
+        {
+            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
+        }
+
         p.FullName = dto.FullName;
+        p.DocumentId = documentId!;
         p.BirthDate = dto.BirthDate;
         p.Email = dto.Email;
         p.Phone = dto.Phone;
