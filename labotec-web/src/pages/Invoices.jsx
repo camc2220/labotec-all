@@ -49,6 +49,7 @@ export default function Invoices() {
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [printPatientKey, setPrintPatientKey] = useState('')
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
+  const [updatingPaidId, setUpdatingPaidId] = useState('')
 
   const isPatient = user?.role === 'patient'
   const canManage = user?.isAdmin || user?.isFacturacion
@@ -254,6 +255,42 @@ export default function Invoices() {
     setSelectedInvoiceIds(prev => (prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]))
   }
 
+  const togglePaidStatus = async (row, paid) => {
+    if (!canManage || isPatient) return
+
+    const id = resolveEntityId(row)
+    if (!id) return
+
+    setUpdatingPaidId(id)
+    setError('')
+
+    try {
+      const itemsPayload = (row.items ?? row.Items ?? [])
+        .map(item => ({
+          labTestId: item.labTestId ?? item.LabTestId,
+          price: item.price ?? item.Price,
+        }))
+        .filter(it => it.labTestId)
+
+      if (itemsPayload.length === 0) throw new Error('Missing invoice items')
+
+      const payload = {
+        number: row.number ?? '',
+        issuedAt: row.issuedAt ?? null,
+        paid,
+        items: itemsPayload,
+      }
+
+      await api.put(`/api/invoices/${id}`, payload)
+      setItems(prev => prev.map(it => (resolveEntityId(it) === id ? { ...it, paid } : it)))
+    } catch (err) {
+      console.error(err)
+      setError('No pudimos actualizar el estado de pago.')
+    } finally {
+      setUpdatingPaidId('')
+    }
+  }
+
   const closePrintModal = () => {
     setShowPrintModal(false)
     setPrintPatientKey('')
@@ -275,7 +312,7 @@ export default function Invoices() {
           ? []
           : [{ header: 'Paciente', accessor: row => row.patientName ?? row.patientId ?? 'Sin nombre' }]),
         { header: 'Factura', accessor: row => row.number ?? '' },
-        { header: 'Monto', accessor: row => row.amount ?? '' },
+        { header: 'Monto', accessor: row => `RD$ ${formatMoney(row.amount ?? row.Amount ?? 0)}` },
         { header: 'Fecha', accessor: row => (row.issuedAt ? formatDate(row.issuedAt) : '') },
         { header: 'Pagada', accessor: row => (row.paid ? 'Sí' : 'No') },
       ],
@@ -322,9 +359,32 @@ export default function Invoices() {
         .filter(Boolean)
         .join(', '),
     },
-    { key: 'amount', header: 'Monto' },
-    { key: 'issuedAt', header: 'Fecha' },
-    { key: 'paid', header: 'Pagada', render: r => r.paid ? 'Sí' : 'No' },
+    { key: 'amount', header: 'Monto', render: row => `RD$ ${formatMoney(row.amount ?? row.Amount ?? 0)}` },
+    { key: 'issuedAt', header: 'Fecha', render: row => (row.issuedAt ? formatDate(row.issuedAt) : '') },
+    {
+      key: 'paid',
+      header: 'Pagada',
+      render: row => {
+        const id = resolveEntityId(row)
+        const checked = Boolean(row.paid)
+
+        if (!canManage || isPatient || !id) return checked ? 'Sí' : 'No'
+
+        const disabled = updatingPaidId === id
+
+        return (
+          <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={disabled}
+              onChange={e => togglePaidStatus(row, e.target.checked)}
+            />
+            <span>{checked ? 'Pagada' : 'Pendiente'}</span>
+          </label>
+        )
+      },
+    },
     ...(!isPatient && canManage
       ? [
         {
@@ -525,8 +585,8 @@ export default function Invoices() {
                       <span>
                         <span className="font-medium">{row.number ?? 'Sin número'}</span>
                         <span className="block text-xs text-gray-500">
-                          {row.amount ?? 'Sin monto'} • {row.issuedAt ? formatDate(row.issuedAt) : 'Sin fecha'} •{' '}
-                          {row.paid ? 'Pagada' : 'Pendiente'}
+                          RD$ {formatMoney(row.amount ?? row.Amount ?? 0)} • {row.issuedAt ? formatDate(row.issuedAt) : 'Sin fecha'}
+                          {' '}• {row.paid ? 'Pagada' : 'Pendiente'}
                         </span>
                       </span>
                     </label>
