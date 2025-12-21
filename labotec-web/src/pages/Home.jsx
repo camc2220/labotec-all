@@ -306,7 +306,7 @@ export default function Home() {
             
             <div className="mt-12 text-center">
               <Link to="/login" className="text-sm font-semibold text-sky-600 hover:text-sky-700">
-                Ver catálogo completo en el portal <span aria-hidden="true">→</span>
+                Iniciar Sesión<span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
