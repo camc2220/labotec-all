@@ -383,10 +383,7 @@ public class ResultsController : ControllerBase
         r.Unit = dto.Unit;
         r.ReleasedAt = dto.ReleasedAt;
         r.PdfUrl = dto.PdfUrl;
-        if (string.IsNullOrWhiteSpace(r.CreatedByName))
-        {
-            r.CreatedByName = GetCurrentUserName();
-        }
+        r.CreatedByName = GetCurrentUserName();
 
         await _db.SaveChangesAsync();
         return NoContent();
