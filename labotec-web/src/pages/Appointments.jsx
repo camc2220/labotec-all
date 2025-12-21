@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import Table from '../components/Table'
 import Modal from '../components/Modal'
@@ -18,6 +18,7 @@ const statusOptions = ['Urgente', 'Rutinario', 'Normal']
 
 export default function Appointments() {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin' || user?.isAdmin
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -25,6 +26,11 @@ export default function Appointments() {
   const [editingItem, setEditingItem] = useState(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [availability, setAvailability] = useState([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+  const [availabilityError, setAvailabilityError] = useState('')
+  const [availabilityForm, setAvailabilityForm] = useState({ id: null, day: '', time: '', slots: '' })
+  const [availabilitySaving, setAvailabilitySaving] = useState(false)
   const [formData, setFormData] = useState({
     patientId: '',
     scheduledAt: '',
@@ -62,6 +68,10 @@ export default function Appointments() {
   useEffect(() => {
     if (user) fetchData()
   }, [endpoint, user])
+
+  useEffect(() => {
+    if (user && isAdmin) fetchAvailability()
+  }, [isAdmin, user])
 
   const openForm = item => {
     if (item) {
@@ -142,27 +152,121 @@ export default function Appointments() {
     }
   }
 
-  const columns = [
-    ...(isPatient ? [] : [{ key: 'patientName', header: 'Paciente' }]),
-    { key: 'scheduledAt', header: 'Fecha/Hora' },
-    { key: 'type', header: 'Tipo' },
-    { key: 'status', header: 'Estado' },
-    { key: 'notes', header: 'Notas' },
-    {
-      key: 'actions',
-      header: 'Acciones',
-      render: row => (
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">
-            {isPatient ? 'Modificar' : 'Editar'}
-          </button>
-          {!isPatient && (
-            <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">Eliminar</button>
-          )}
-        </div>
-      ),
-    },
-  ]
+  const fetchAvailability = async () => {
+    setAvailabilityLoading(true)
+    setAvailabilityError('')
+    try {
+      const res = await api.get('/api/appointments/availability')
+      setAvailability(res.data?.items ?? res.data?.Items ?? res.data ?? [])
+    } catch (err) {
+      console.error(err)
+      setAvailabilityError('No pudimos cargar la disponibilidad. Intenta nuevamente más tarde.')
+    } finally {
+      setAvailabilityLoading(false)
+    }
+  }
+
+  const normalizeAvailabilityPayload = form => ({
+    day: form.day,
+    time: form.time,
+    slots: Number(form.slots) || 0,
+  })
+
+  const handleAvailabilitySubmit = async e => {
+    e.preventDefault()
+    setAvailabilitySaving(true)
+    setAvailabilityError('')
+    try {
+      if (!availabilityForm.day || !availabilityForm.time) {
+        throw new Error('Debes completar el día y la hora.')
+      }
+
+      const payload = normalizeAvailabilityPayload(availabilityForm)
+
+      const resourceUrl = availabilityForm.id
+        ? `/api/appointments/availability/${availabilityForm.id}`
+        : '/api/appointments/availability'
+
+      if (availabilityForm.id) {
+        await api.put(resourceUrl, payload)
+      } else {
+        await api.post(resourceUrl, payload)
+      }
+
+      setAvailabilityForm({ id: null, day: '', time: '', slots: '' })
+      fetchAvailability()
+    } catch (err) {
+      console.error(err)
+      setAvailabilityError(
+        err?.message || 'No pudimos guardar la disponibilidad. Revisa los datos e intenta nuevamente.',
+      )
+    } finally {
+      setAvailabilitySaving(false)
+    }
+  }
+
+  const handleAvailabilityEdit = slot => {
+    setAvailabilityForm({
+      id: resolveEntityId(slot),
+      day: slot.day || slot.date || slot.scheduledDay || slot.dateTime?.split('T')[0] || '',
+      time:
+        slot.time ||
+        slot.hour ||
+        slot.scheduledTime ||
+        (slot.dateTime?.split('T')[1]?.slice(0, 5) ?? ''),
+      slots: slot.slots ?? slot.availableSlots ?? slot.capacity ?? '',
+    })
+  }
+
+  const formatDate = value => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleDateString('es-ES', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  const formatTime = value => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) {
+      return value.length > 5 ? value.slice(0, 5) : value
+    }
+    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const appointmentColumns = useMemo(
+    () => [
+      ...(isPatient ? [] : [{ key: 'patientName', header: 'Paciente' }]),
+      {
+        key: 'scheduledDay',
+        header: 'Día',
+        render: row => formatDate(row.scheduledAt),
+      },
+      {
+        key: 'scheduledTime',
+        header: 'Hora',
+        render: row => formatTime(row.scheduledAt),
+      },
+      { key: 'type', header: 'Tipo' },
+      { key: 'status', header: 'Estado' },
+      { key: 'notes', header: 'Notas' },
+      {
+        key: 'actions',
+        header: 'Acciones',
+        render: row => (
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">
+              {isPatient ? 'Modificar' : 'Editar'}
+            </button>
+            {!isPatient && (
+              <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">Eliminar</button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [isPatient],
+  )
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
   return (
@@ -192,12 +296,117 @@ export default function Appointments() {
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
           ) : items.length > 0 ? (
-            <Table columns={columns} data={items} />
+            <Table columns={appointmentColumns} data={items} />
           ) : (
             <div className="text-sm text-gray-500">{isPatient ? 'Aún no tienes citas programadas.' : 'No hay citas registradas.'}</div>
           )}
         </div>
       </div>
+
+      {isAdmin && (
+        <div className={panelClass}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Disponibilidad por día y hora</h3>
+              <p className="text-sm text-gray-600">
+                Ajusta los cupos disponibles para cada franja horaria y controla cuántas citas se pueden reservar.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleAvailabilitySubmit} className="mt-4 grid gap-4 md:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">Día</label>
+              <input
+                type="date"
+                value={availabilityForm.day}
+                onChange={e => setAvailabilityForm({ ...availabilityForm, day: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">Hora</label>
+              <input
+                type="time"
+                value={availabilityForm.time}
+                onChange={e => setAvailabilityForm({ ...availabilityForm, time: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">Citas disponibles</label>
+              <input
+                type="number"
+                min="0"
+                value={availabilityForm.slots}
+                onChange={e => setAvailabilityForm({ ...availabilityForm, slots: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                required
+              />
+            </div>
+            <div className="flex items-end justify-end gap-2">
+              {availabilityForm.id && (
+                <button
+                  type="button"
+                  onClick={() => setAvailabilityForm({ id: null, day: '', time: '', slots: '' })}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-50"
+                >
+                  Cancelar edición
+                </button>
+              )}
+              <button
+                type="submit"
+                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+                disabled={availabilitySaving}
+              >
+                {availabilitySaving ? 'Guardando...' : availabilityForm.id ? 'Actualizar cupos' : 'Agregar disponibilidad'}
+              </button>
+            </div>
+          </form>
+
+          <div className="mt-4 space-y-3">
+            {availabilityError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{availabilityError}</div>
+            )}
+            {availabilityLoading ? (
+              <div className="text-sm text-gray-600">Cargando disponibilidad...</div>
+            ) : availability.length > 0 ? (
+              <Table
+                columns={[
+                  {
+                    key: 'day',
+                    header: 'Día',
+                    render: row => formatDate(row.day || row.date || row.scheduledDay || row.dateTime),
+                  },
+                  {
+                    key: 'time',
+                    header: 'Hora',
+                    render: row => formatTime(row.time || row.hour || row.scheduledTime || row.dateTime),
+                  },
+                  { key: 'slots', header: 'Citas disponibles', render: row => row.slots ?? row.availableSlots ?? row.capacity },
+                  {
+                    key: 'actions',
+                    header: 'Acciones',
+                    render: row => (
+                      <button
+                        onClick={() => handleAvailabilityEdit(row)}
+                        className="text-xs font-semibold text-sky-700 hover:underline"
+                      >
+                        Editar cupos
+                      </button>
+                    ),
+                  },
+                ]}
+                data={availability}
+              />
+            ) : (
+              <div className="text-sm text-gray-500">Agrega cupos para comenzar a gestionar la disponibilidad.</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <Modal title={editingItem ? 'Editar cita' : 'Agregar cita'} onClose={closeForm}>
