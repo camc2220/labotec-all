@@ -62,12 +62,19 @@ export default function Home() {
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
-    setRegisterData((prev) => ({ ...prev, [name]: value }))
+    const nextValue = name === 'documentId'
+      ? value.replace(/\D/g, '').slice(0, 11)
+      : value
+    setRegisterData((prev) => ({ ...prev, [name]: nextValue }))
   }
 
   const handleRegisterSubmit = async (event) => {
     event.preventDefault()
     setRegisterStatus(null)
+    if (registerData.documentId.length !== 11) {
+      setRegisterStatus({ type: 'error', message: 'La cédula/ID debe tener exactamente 11 dígitos.' })
+      return
+    }
     setRegisterLoading(true)
     try {
       const payload = {
@@ -200,7 +207,18 @@ export default function Home() {
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 mb-1">Cédula / ID</label>
-                          <input required name="documentId" value={registerData.documentId} onChange={handleRegisterChange} className="w-full rounded-lg border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500" placeholder="000-0000000-0" />
+                          <input
+                            required
+                            name="documentId"
+                            value={registerData.documentId}
+                            onChange={handleRegisterChange}
+                            className="w-full rounded-lg border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                            placeholder="00000000000"
+                            inputMode="numeric"
+                            minLength={11}
+                            maxLength={11}
+                            pattern="[0-9]{11}"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 mb-1">Teléfono</label>

@@ -223,6 +223,7 @@ public class PatientsController : ControllerBase
     }
 }*/
 
+using System.Linq;
 using System.Security.Claims;
 using Labotec.Api.Auth;
 using Labotec.Api.Common;
@@ -331,10 +332,16 @@ public class PatientsController : ControllerBase
     [Authorize(Roles = "Admin,Recepcion")]
     public async Task<ActionResult<PatientReadDto>> Create([FromBody] PatientCreateDto dto)
     {
+        var documentId = dto.DocumentId?.Trim();
+        if (!IsValidDocumentId(documentId))
+        {
+            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
+        }
+
         var entity = new Domain.Patient
         {
             FullName = dto.FullName,
-            DocumentId = dto.DocumentId,
+            DocumentId = documentId!,
             BirthDate = dto.BirthDate,
             Email = dto.Email,
             Phone = dto.Phone
@@ -500,5 +507,11 @@ public class PatientsController : ControllerBase
         }
 
         return NoContent();
+    }
+
+    private static bool IsValidDocumentId(string? documentId)
+    {
+        if (string.IsNullOrWhiteSpace(documentId)) return false;
+        return documentId.All(char.IsDigit) && documentId.Length == 11;
     }
 }

@@ -52,6 +52,12 @@ namespace Labotec.Api.Controllers
                 return BadRequest("El correo electrónico es obligatorio.");
             }
 
+            var documentId = dto.DocumentId?.Trim();
+            if (!IsValidDocumentId(documentId))
+            {
+                return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
+            }
+
             var derivedUserName = DeriveUserNameFromEmail(email);
             if (string.IsNullOrWhiteSpace(derivedUserName))
             {
@@ -80,7 +86,7 @@ namespace Labotec.Api.Controllers
             var patient = new Patient
             {
                 FullName = dto.FullName,
-                DocumentId = dto.DocumentId,
+                DocumentId = documentId!,
                 BirthDate = dto.BirthDate,
                 Email = email,
                 Phone = dto.Phone,
@@ -220,6 +226,12 @@ namespace Labotec.Api.Controllers
             return roles[0];
         }
 
+        private static bool IsValidDocumentId(string? documentId)
+        {
+            if (string.IsNullOrWhiteSpace(documentId)) return false;
+            return documentId.All(char.IsDigit) && documentId.Length == 11;
+        }
+
         // ===========================
         // REGISTRO
         // ===========================
@@ -231,6 +243,12 @@ namespace Labotec.Api.Controllers
             if (string.IsNullOrWhiteSpace(email))
             {
                 return BadRequest("El correo electrónico es obligatorio.");
+            }
+
+            var documentId = dto.DocumentId?.Trim();
+            if (!IsValidDocumentId(documentId))
+            {
+                return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
             }
 
             var derivedUserName = DeriveUserNameFromEmail(email);
@@ -261,7 +279,7 @@ namespace Labotec.Api.Controllers
             var patient = new Patient
             {
                 FullName = dto.FullName,
-                DocumentId = dto.DocumentId,
+                DocumentId = documentId!,
                 BirthDate = dto.BirthDate,
                 Email = email,
                 Phone = dto.Phone,

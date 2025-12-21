@@ -86,6 +86,10 @@ export default function Patients() {
     e.preventDefault()
     if (user?.role !== 'admin') return
     setFormError('')
+    if (formData.documentId.length !== 11) {
+      setFormError('La cédula/ID debe tener exactamente 11 dígitos.')
+      return
+    }
     setSaving(true)
     try {
       const payload = { ...formData }
@@ -263,9 +267,13 @@ export default function Patients() {
               <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">Documento</label>
               <input
                 value={formData.documentId}
-                onChange={e => setFormData({ ...formData, documentId: e.target.value })}
+                onChange={e => setFormData({ ...formData, documentId: e.target.value.replace(/\D/g, '').slice(0, 11) })}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
                 required
+                inputMode="numeric"
+                minLength={11}
+                maxLength={11}
+                pattern="[0-9]{11}"
               />
             </div>
             <div className="grid gap-4 md:grid-cols-3">
