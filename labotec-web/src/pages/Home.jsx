@@ -59,6 +59,7 @@ export default function Home() {
   const [registerLoading, setRegisterLoading] = useState(false)
   const [activeTests, setActiveTests] = useState([])
   const [testsLoading, setTestsLoading] = useState(true)
+  const [showAll, setShowAll] = useState(false)
 
   const handleRegisterChange = (event) => {
     const { name, value } = event.target
@@ -107,7 +108,7 @@ export default function Home() {
         const response = await api.get('/api/labtests/public')
         const items = response.data.items ?? response.data.Items ?? response.data ?? []
         const filtered = items.filter((item) => Boolean(item.active ?? item.Active ?? true))
-        setActiveTests(filtered.slice(0, 6)) // Show top 6
+        setActiveTests(filtered) // Guardamos todos los activos
       } catch (error) {
         console.error(error)
       } finally {
@@ -116,6 +117,8 @@ export default function Home() {
     }
     loadActiveTests()
   }, [])
+
+  const displayedTests = showAll ? activeTests : activeTests.slice(0, 6)
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-sky-100 selection:text-sky-700">
@@ -302,8 +305,8 @@ export default function Home() {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {testsLoading ? (
                 [1,2,3].map(i => <div key={i} className="h-32 bg-white rounded-2xl shadow-sm animate-pulse"></div>)
-              ) : activeTests.length > 0 ? (
-                activeTests.map((test) => (
+              ) : displayedTests.length > 0 ? (
+                displayedTests.map((test) => (
                   <div key={test.id || test.code} className="group relative rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition hover:shadow-md hover:ring-sky-200">
                     <div className="flex items-center justify-between">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 text-sky-600 group-hover:bg-sky-600 group-hover:text-white transition-colors">
@@ -323,9 +326,14 @@ export default function Home() {
             </div>
             
             <div className="mt-12 text-center">
-              <Link to="/login" className="text-sm font-semibold text-sky-600 hover:text-sky-700">
-                Iniciar Sesión<span aria-hidden="true">→</span>
-              </Link>
+              {activeTests.length > 6 && (
+                <button 
+                  onClick={() => setShowAll(!showAll)}
+                  className="rounded-full border border-sky-200 bg-white px-6 py-2.5 text-sm font-bold text-sky-600 shadow-sm transition hover:bg-sky-50 hover:border-sky-300"
+                >
+                  {showAll ? 'Ver menos' : 'Ver catálogo completo de servicios'}
+                </button>
+              )}
             </div>
           </div>
         </section>

@@ -322,6 +322,7 @@ export default function Invoices() {
       : rows.every(row => getPatientKey(row) === getPatientKey(rows[0]))
         ? `Facturas de ${rows[0]?.patientName ?? 'paciente'}`
         : 'Facturas de pacientes'
+    
     printRecords({
       title,
       subtitle: `Listado generado por ${displayUserName}`,
@@ -343,6 +344,32 @@ export default function Invoices() {
       ].filter(Boolean),
       footerNote: 'Gracias por confiar en Labotec. Si necesitas soporte sobre tus pagos o facturas, contáctanos con este listado.',
       rows,
+      // Esta función genera el HTML interno para el detalle de la factura
+      renderRowDetails: (row) => {
+        const items = row.items ?? row.Items ?? []
+        if (!items || items.length === 0) return null
+        
+        const itemsHtml = items.map(item => `
+          <tr>
+            <td>${item.name ?? item.Name ?? item.code ?? item.Code ?? 'Prueba sin nombre'}</td>
+            <td class="text-right">RD$ ${formatMoney(item.price ?? item.Price ?? 0)}</td>
+          </tr>
+        `).join('')
+
+        return `
+          <table class="sub-table">
+            <thead>
+              <tr>
+                <th>Descripción / Prueba</th>
+                <th class="text-right">Precio</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        `
+      }
     })
   }
 

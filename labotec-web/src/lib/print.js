@@ -13,6 +13,7 @@ export function printRecords({
   info = [],
   brandName = 'Labotec SRL',
   footerNote = '',
+  renderRowDetails = null, 
 }) {
   if (typeof window === 'undefined') return
   if (!rows.length) {
@@ -27,6 +28,7 @@ export function printRecords({
   }
 
   const headerCells = columns.map(col => `<th>${escapeHtml(col.header)}</th>`).join('')
+  
   const bodyRows = rows
     .map((row, index) => {
       const cells = columns
@@ -35,7 +37,27 @@ export function printRecords({
           return `<td>${escapeHtml(value ?? '')}</td>`
         })
         .join('')
-      return `<tr><td class="index-cell">${index + 1}</td>${cells}</tr>`
+      
+      const mainRow = `<tr><td class="index-cell">${index + 1}</td>${cells}</tr>`
+      
+      // Lógica para detalles (desglose)
+      let detailRow = ''
+      if (renderRowDetails) {
+        const detailsHtml = renderRowDetails(row)
+        if (detailsHtml) {
+          detailRow = `
+            <tr class="detail-row">
+              <td colspan="${columns.length + 1}">
+                <div class="detail-container">
+                  ${detailsHtml}
+                </div>
+              </td>
+            </tr>
+          `
+        }
+      }
+
+      return mainRow + detailRow
     })
     .join('')
 
@@ -230,9 +252,50 @@ export function printRecords({
         }
 
         /* Zebra Striping */
-        tbody tr:nth-child(even) {
+        /* Only apply stripe to main rows if not expanding details heavily, 
+           or use specific logic. Here we keep simple striping but detail row needs care */
+        tbody tr:not(.detail-row):nth-child(4n-3) {
           background-color: var(--bg-row-alt);
         }
+
+        /* Detail Row Styles */
+        .detail-row td {
+          padding: 0 40px 15px 40px; /* Indent content */
+          border-bottom: 1px solid var(--border);
+          background-color: inherit;
+        }
+
+        .detail-container {
+          background-color: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+          padding: 10px;
+        }
+
+        /* Styles for inner content (passed via renderRowDetails) */
+        .sub-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .sub-table th {
+          font-size: 9px;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          border-bottom: 1px solid #cbd5e1;
+          padding: 4px 0;
+          background: transparent;
+        }
+        .sub-table td {
+          font-size: 10px;
+          color: var(--text-main);
+          border-bottom: 1px solid #e2e8f0;
+          padding: 4px 0;
+        }
+        .sub-table tr:last-child td {
+          border-bottom: none;
+        }
+        .text-right { text-align: right; }
+        .text-bold { font-weight: 600; }
 
         /* Footer */
         .doc-footer {
