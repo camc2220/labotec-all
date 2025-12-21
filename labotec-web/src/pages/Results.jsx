@@ -450,9 +450,9 @@ export default function Results() {
                           const selected = testOptions.find(option => option.id === e.target.value)
                           handleResultChange(index, {
                             testId: e.target.value,
-                            testName: selected?.name ?? result.testName,
-                            unit: selected?.unit ?? result.unit,
-                            unitOption: resolveUnitOption(selected?.unit ?? result.unit),
+                            testName: selected?.name ?? '',
+                            unit: selected?.unit ?? '',
+                            unitOption: resolveUnitOption(selected?.unit ?? ''),
                           })
                         }}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -473,8 +473,12 @@ export default function Results() {
                         value={result.testName}
                         onChange={e => handleResultChange(index, { testName: e.target.value })}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
+                        disabled={Boolean(result.testId)}
                         required
                       />
+                      {result.testId && (
+                        <p className="mt-1 text-xs text-gray-500">Este nombre proviene de la prueba seleccionada.</p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
