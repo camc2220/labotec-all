@@ -58,6 +58,7 @@ export default function UserManagement() {
   const [successMessage, setSuccessMessage] = useState('')
   const [updatingMap, setUpdatingMap] = useState({})
   const [resettingMap, setResettingMap] = useState({})
+  const [deletingMap, setDeletingMap] = useState({})
 
   const resolveUserIdentifier = user => {
     if (!user) return undefined
@@ -72,6 +73,30 @@ export default function UserManagement() {
       user.email ??
       user.name
     )
+  }
+
+  const resolveUserName = user => {
+    if (!user) return ''
+
+    const composedName = [user.firstName ?? user.FirstName, user.lastName ?? user.LastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    const candidates = [
+      composedName,
+      user.name,
+      user.fullName,
+      user.fullname,
+      user.displayName,
+      user.userName,
+      user.username,
+      user.email,
+      resolveUserIdentifier(user),
+    ]
+
+    const resolved = candidates.find(value => typeof value === 'string' && value.trim().length > 0)
+    return resolved?.trim() ?? 'Sin nombre'
   }
 
   const normalizeUsers = data => {
@@ -89,7 +114,8 @@ export default function UserManagement() {
     return rawUsers.map(item => {
       const role = normalizeRole(item.roles ?? item.Roles)
       const status = resolveStatus(item.isLocked ?? item.IsLocked, item.lockoutEnd ?? item.LockoutEnd)
-      return { ...item, role, status }
+      const name = resolveUserName(item)
+      return { ...item, role, status, name }
     })
   }
 
@@ -146,6 +172,31 @@ export default function UserManagement() {
       setError('No pudimos actualizar el rol. Intenta nuevamente más tarde.')
     } finally {
       setUpdatingMap(prev => {
+        const copy = { ...prev }
+        delete copy[entityId]
+        return copy
+      })
+    }
+  }
+
+  const handleDeleteUser = async target => {
+    if (!isAdmin) return
+    const entityId = resolveUserIdentifier(target)
+    if (!entityId) return
+
+    setError('')
+    setSuccessMessage('')
+    setDeletingMap(prev => ({ ...prev, [entityId]: true }))
+
+    try {
+      await api.delete(`/api/users/${entityId}`)
+      setItems(prev => prev.filter(item => resolveUserIdentifier(item) !== entityId))
+      setSuccessMessage('El usuario fue eliminado correctamente.')
+    } catch (err) {
+      console.error(err)
+      setError('No pudimos eliminar al usuario. Intenta nuevamente más tarde.')
+    } finally {
+      setDeletingMap(prev => {
         const copy = { ...prev }
         delete copy[entityId]
         return copy
@@ -294,8 +345,27 @@ export default function UserManagement() {
           )
         },
       },
+      {
+        key: 'delete',
+        header: 'Eliminar',
+        render: row => {
+          if (row.role === 'admin') return <span className="text-xs text-slate-500">—</span>
+          const entityId = resolveEntityId(row)
+          const isDeleting = !!deletingMap[entityId]
+          const isBusy = isDeleting || !!updatingMap[entityId] || !!resettingMap[entityId]
+          return (
+            <button
+              className="text-xs font-semibold text-red-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+              onClick={() => handleDeleteUser(row)}
+              disabled={isBusy}
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </button>
+          )
+        },
+      },
     ]
-  }, [isAdmin, resettingMap, updatingMap])
+  }, [isAdmin, resettingMap, updatingMap, deletingMap])
 
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
