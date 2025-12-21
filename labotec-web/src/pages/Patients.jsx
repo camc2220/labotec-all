@@ -8,7 +8,8 @@ import { useAuth } from '../context/AuthContext'
 export default function Patients() {
   const { user } = useAuth()
   const canManage = user?.role === 'admin'
-  const canView = canManage || user?.role === 'recepcion' || user?.isRecepcion
+  const canView =
+    canManage || user?.role === 'recepcion' || user?.isRecepcion || user?.role === 'bioanalista'
   const [items, setItems] = useState([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)

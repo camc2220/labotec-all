@@ -164,7 +164,7 @@ public class AppointmentsController : ControllerBase
     {
         var q = _db.Appointments.AsNoTracking().Include(a => a.Patient).AsQueryable();
 
-        var isStaff = User.IsInRole("Admin") || User.IsInRole("Recepcion");
+        var isStaff = User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
         var currentPatientId = User.GetPatientId();
 
         // ✅ Staff puede listar todas

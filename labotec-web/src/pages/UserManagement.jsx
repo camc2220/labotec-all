@@ -8,6 +8,7 @@ const ROLE_LABELS = {
   admin: 'Administrador',
   recepcion: 'Recepción',
   facturacion: 'Facturación',
+  bioanalista: 'Bioanalista',
   patient: 'Paciente',
 }
 
@@ -15,6 +16,7 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: ROLE_LABELS.admin },
   { value: 'recepcion', label: ROLE_LABELS.recepcion },
   { value: 'facturacion', label: ROLE_LABELS.facturacion },
+  { value: 'bioanalista', label: ROLE_LABELS.bioanalista },
   { value: 'patient', label: ROLE_LABELS.patient },
 ]
 
@@ -30,6 +32,7 @@ const normalizeRole = roles => {
   if (normalized.some(r => r === 'admin')) return 'admin'
   if (normalized.some(r => ['recepcion', 'recepción', 'recepcionista', 'reception'].includes(r))) return 'recepcion'
   if (normalized.some(r => ['facturacion', 'facturación', 'billing'].includes(r))) return 'facturacion'
+  if (normalized.some(r => ['bioanalista', 'bio-analista', 'bio analyst'].includes(r))) return 'bioanalista'
   return 'patient'
 }
 
@@ -37,6 +40,7 @@ const toApiRole = role => {
   if (role === 'admin') return 'Admin'
   if (role === 'recepcion') return 'Recepcion'
   if (role === 'facturacion') return 'Facturacion'
+  if (role === 'bioanalista') return 'Bioanalista'
   return 'Paciente'
 }
 

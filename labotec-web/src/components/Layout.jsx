@@ -7,6 +7,7 @@ function getRoleLabel(user) {
   if (user.isAdmin) return 'Administrador'
   if (user.isRecepcion) return 'Recepción'
   if (user.isFacturacion) return 'Facturación'
+  if (user.isBioanalista) return 'Bioanalista'
   return 'Paciente'
 }
 
@@ -40,6 +41,15 @@ export default function Layout() {
       return [
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
+        { to: '/app/profile', label: 'Mi perfil' },
+      ]
+    }
+
+    if (user.isBioanalista) {
+      return [
+        { to: '/app/patients', label: 'Pacientes' },
+        { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/results', label: 'Resultados' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
     }
