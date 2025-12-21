@@ -60,13 +60,13 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-white to-emerald-50 text-gray-800">
-      <header className="border-b bg-white/90 backdrop-blur">
+      <header className="border-b border-blue-500/30 bg-blue-600 text-white shadow">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <Link to="/" className="flex items-center gap-2 text-sky-700">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-100 font-semibold">L</span>
+          <Link to="/" className="flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 font-semibold text-white">L</span>
             <div>
-              <p className="text-xs uppercase tracking-widest">Labotec</p>
-              <p className="text-sm font-semibold text-gray-900">Portal clínico</p>
+              <p className="text-xs uppercase tracking-widest text-white/80">Labotec</p>
+              <p className="text-sm font-semibold text-white">Portal clínico</p>
             </div>
           </Link>
           <nav className="hidden items-center gap-2 text-sm font-medium md:flex">
@@ -77,8 +77,8 @@ export default function Layout() {
                 className={({ isActive }) =>
                   `rounded-xl border px-3 py-2 transition ${
                     isActive
-                      ? 'border-sky-200 bg-sky-50 text-sky-700 shadow-sm'
-                      : 'border-transparent text-gray-600 hover:border-sky-100 hover:bg-white hover:text-sky-700'
+                      ? 'border-white/50 bg-white/20 text-white shadow-sm backdrop-blur'
+                      : 'border-white/10 text-white/90 hover:border-white/40 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -87,13 +87,13 @@ export default function Layout() {
             ))}
           </nav>
           <div className="flex items-center gap-3 text-right">
-            <div className="leading-tight text-xs text-gray-500">
-              <p className="text-sm font-semibold text-gray-800">{user.name}</p>
+            <div className="leading-tight text-xs text-white/80">
+              <p className="text-sm font-semibold text-white">{user.name}</p>
               <p className="capitalize">{roleLabel}</p>
             </div>
             <button
               onClick={logout}
-              className="rounded-full border border-slate-200 px-3 py-1.5 text-sm text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+              className="rounded-full border border-white/20 px-3 py-1.5 text-sm text-white transition hover:border-white/50 hover:bg-white/10"
             >
               Salir
             </button>
