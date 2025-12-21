@@ -12,6 +12,8 @@ const getResultKey = row =>
   resolveEntityId(row) ??
   `${getPatientKey(row)}-${row?.testName ?? ''}-${row?.releasedAt ?? ''}-${row?.resultValue ?? ''}`
 
+const UNIT_OPTIONS = ['mg/dL', 'g/dL', 'IU/L', 'mmol/L', '%', 'other']
+
 const formatDateTime = value => {
   if (!value) return ''
   try {
@@ -20,6 +22,23 @@ const formatDateTime = value => {
     return date.toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })
   } catch {
     return value
+  }
+}
+
+const resolveUnitOption = unit => {
+  const normalized = (unit ?? '').trim().toLowerCase()
+  const match = UNIT_OPTIONS.find(option => option !== 'other' && option.toLowerCase() === normalized)
+  return match ?? (unit ? 'other' : '')
+}
+
+const buildResultState = result => {
+  const unitOption = resolveUnitOption(result?.unit)
+  return {
+    testId: result?.testId ?? '',
+    testName: result?.testName ?? '',
+    resultValue: result?.resultValue ?? '',
+    unit: result?.unit ?? '',
+    unitOption,
   }
 }
 
@@ -35,14 +54,7 @@ export default function Results() {
   const [formData, setFormData] = useState({
     patientId: '',
     releasedAt: '',
-    results: [
-      {
-        testId: '',
-        testName: '',
-        resultValue: '',
-        unit: '',
-      },
-    ],
+    results: [buildResultState({})],
   })
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [printPatientKey, setPrintPatientKey] = useState('')
@@ -51,6 +63,7 @@ export default function Results() {
   const [loadingTests, setLoadingTests] = useState(false)
 
   const isPatient = user?.role === 'patient'
+  const displayUserName = user?.name ?? 'Usuario'
   const endpoint = isPatient ? '/api/patients/me/results' : '/api/results'
 
   const loadLabTests = async () => {
@@ -104,12 +117,12 @@ export default function Results() {
         patientId: item.patientId ?? '',
         releasedAt: item.releasedAt ? item.releasedAt.slice(0, 16) : '',
         results: [
-          {
+          buildResultState({
             testId: resolveEntityId(matchedTest) ?? '',
             testName: item.testName ?? '',
             resultValue: item.resultValue ?? '',
             unit: item.unit ?? '',
-          },
+          }),
         ],
       })
       setEditingItem(item)
@@ -117,14 +130,7 @@ export default function Results() {
       setFormData({
         patientId: '',
         releasedAt: '',
-        results: [
-          {
-            testId: '',
-            testName: '',
-            resultValue: '',
-            unit: '',
-          },
-        ],
+        results: [buildResultState({})],
       })
       setEditingItem(null)
     }
@@ -251,7 +257,7 @@ export default function Results() {
         : 'Resultados de pacientes'
     printRecords({
       title,
-      subtitle: 'Listado generado desde Labotec',
+      subtitle: `Listado generado por ${displayUserName}`,
       columns: [
         ...(isPatient
           ? []
@@ -259,6 +265,7 @@ export default function Results() {
         { header: 'Prueba', accessor: row => row.testName ?? '' },
         { header: 'Resultado', accessor: row => row.resultValue ?? '' },
         { header: 'Unidad', accessor: row => row.unit ?? '' },
+        { header: 'Registrado por', accessor: row => row.createdByName ?? 'Desconocido' },
         { header: 'Liberado', accessor: row => (row.releasedAt ? formatDateTime(row.releasedAt) : '') },
       ],
       rows,
@@ -284,6 +291,7 @@ export default function Results() {
     { key: 'testName', header: 'Prueba' },
     { key: 'resultValue', header: 'Resultado' },
     { key: 'unit', header: 'Unidad' },
+    { key: 'createdByName', header: 'Registrado por' },
     { key: 'releasedAt', header: 'Liberado' },
     ...(!isPatient
       ? [
@@ -307,12 +315,7 @@ export default function Results() {
       ...prev,
       results: [
         ...prev.results,
-        {
-          testId: '',
-          testName: '',
-          resultValue: '',
-          unit: '',
-        },
+        buildResultState({}),
       ],
     }))
   }
@@ -329,6 +332,24 @@ export default function Results() {
       ...prev,
       results: prev.results.map((item, idx) => (idx === index ? { ...item, ...updates } : item)),
     }))
+  }
+
+  const handleUnitOptionChange = (index, option) => {
+    setFormData(prev => {
+      const nextResults = prev.results.map((item, idx) => {
+        if (idx !== index) return item
+        const isSameOption = item.unitOption === option
+        const newUnitOption = isSameOption ? '' : option
+        const newUnitValue = newUnitOption === 'other' ? item.unit : newUnitOption
+        return {
+          ...item,
+          unitOption: newUnitOption,
+          unit: newUnitOption ? newUnitValue : '',
+        }
+      })
+
+      return { ...prev, results: nextResults }
+    })
   }
 
   const testOptions = useMemo(
@@ -429,8 +450,9 @@ export default function Results() {
                           const selected = testOptions.find(option => option.id === e.target.value)
                           handleResultChange(index, {
                             testId: e.target.value,
-                            testName: selected?.name ?? result.testName,
-                            unit: selected?.unit ?? result.unit,
+                            testName: selected?.name ?? '',
+                            unit: selected?.unit ?? '',
+                            unitOption: resolveUnitOption(selected?.unit ?? ''),
                           })
                         }}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
@@ -451,8 +473,12 @@ export default function Results() {
                         value={result.testName}
                         onChange={e => handleResultChange(index, { testName: e.target.value })}
                         className="w-full rounded-lg border px-3 py-2 text-sm"
+                        disabled={Boolean(result.testId)}
                         required
                       />
+                      {result.testId && (
+                        <p className="mt-1 text-xs text-gray-500">Este nombre proviene de la prueba seleccionada.</p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 grid gap-4 md:grid-cols-2">
@@ -467,12 +493,29 @@ export default function Results() {
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Unidad</label>
-                      <input
-                        value={result.unit}
-                        onChange={e => handleResultChange(index, { unit: e.target.value })}
-                        className="w-full rounded-lg border px-3 py-2 text-sm"
-                        placeholder="mg/dL, g/dL, etc."
-                      />
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                          {UNIT_OPTIONS.map(option => (
+                            <label key={option} className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={result.unitOption === option}
+                                onChange={() => handleUnitOptionChange(index, option)}
+                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{option === 'other' ? 'Otro' : option}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {result.unitOption === 'other' && (
+                          <input
+                            value={result.unit}
+                            onChange={e => handleResultChange(index, { unit: e.target.value, unitOption: 'other' })}
+                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                            placeholder="Escribe la unidad"
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -533,6 +576,7 @@ export default function Results() {
                         <span className="block text-xs text-gray-500">
                           {row.resultValue ?? 'Sin resultado'} {row.unit ?? ''} •{' '}
                           {row.releasedAt ? formatDateTime(row.releasedAt) : 'Sin fecha'}
+                          {row.createdByName ? ` • Registrado por ${row.createdByName}` : ''}
                         </span>
                       </span>
                     </label>
