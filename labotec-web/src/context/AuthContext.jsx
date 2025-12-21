@@ -166,12 +166,13 @@ function getUserFromToken(token, fallbackName) {
   const role = pickPrimaryRole(roles)
 
   const patientId = payload.patientId ?? payload.PatientId ?? null
-  const name =
+  const userName =
     payload.unique_name ||
-    payload.name ||
+    payload.nameid ||
     payload.sub ||
     fallbackName ||
-    'Usuario'
+    null
+  const name = payload.name || userName || fallbackName || 'Usuario'
 
   const isAdmin = role === 'admin'
   const isRecepcion = role === 'recepcion'
@@ -182,6 +183,7 @@ function getUserFromToken(token, fallbackName) {
 
   return {
     name,
+    userName,
     role,
     roles,
     patientId,
@@ -214,6 +216,7 @@ function normalizeUser(rawUser, fallbackName, token) {
 
   return {
     name: rawUser?.name || tokenUser.name || fallbackName || 'Usuario',
+    userName: rawUser?.userName || rawUser?.username || tokenUser.userName || null,
     role,
     roles: mergedRoles,
     patientId: rawUser?.patientId ?? tokenUser.patientId ?? null,

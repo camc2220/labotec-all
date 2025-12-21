@@ -150,6 +150,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Labotec.Api.Controllers
 {
@@ -255,7 +256,8 @@ namespace Labotec.Api.Controllers
                 user = new
                 {
                     id = user.Id,
-                    name = user.UserName,
+                    name = patient.FullName ?? user.UserName,
+                    userName = user.UserName,
                     roles = roles,
                     role = PickPrimaryRole(roles),
                     patientId = patient.Id
@@ -306,13 +308,18 @@ namespace Labotec.Api.Controllers
             var claims = await _userManager.GetClaimsAsync(user);
             var patientId = claims.FirstOrDefault(c => c.Type == AppClaims.PatientId)?.Value;
 
+            var patient = await _db.Patients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == user.Id);
+
             return Ok(new
             {
                 token,
                 user = new
                 {
                     id = user.Id,
-                    name = user.UserName,
+                    name = patient?.FullName ?? user.UserName,
+                    userName = user.UserName,
                     roles = roles,                 // ✅ roles reales
                     role = PickPrimaryRole(roles), // ✅ rol principal (según prioridad)
                     patientId
