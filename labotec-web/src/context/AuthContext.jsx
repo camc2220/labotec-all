@@ -144,10 +144,11 @@ function getRolesFromPayload(payload) {
 }
 
 function pickPrimaryRole(roles) {
-  // prioridad: admin > recepcion > facturacion > patient
+  // prioridad: admin > recepcion > facturacion > bioanalista > patient
   if (roles.includes('admin')) return 'admin'
   if (roles.includes('recepcion') || roles.includes('recepcionista') || roles.includes('reception')) return 'recepcion'
   if (roles.includes('facturacion') || roles.includes('billing')) return 'facturacion'
+  if (roles.includes('bioanalista') || roles.includes('bio-analista') || roles.includes('bio analyst')) return 'bioanalista'
   if (roles.includes('paciente') || roles.includes('patient')) return 'patient'
   return 'patient'
 }
@@ -175,10 +176,22 @@ function getUserFromToken(token, fallbackName) {
   const isAdmin = role === 'admin'
   const isRecepcion = role === 'recepcion'
   const isFacturacion = role === 'facturacion'
+  const isBioanalista = role === 'bioanalista'
   const isPatient = role === 'patient'
   const isStaff = !isPatient
 
-  return { name, role, roles, patientId, isAdmin, isRecepcion, isFacturacion, isPatient, isStaff }
+  return {
+    name,
+    role,
+    roles,
+    patientId,
+    isAdmin,
+    isRecepcion,
+    isFacturacion,
+    isBioanalista,
+    isPatient,
+    isStaff,
+  }
 }
 
 function normalizeUser(rawUser, fallbackName, token) {
@@ -195,6 +208,7 @@ function normalizeUser(rawUser, fallbackName, token) {
   const isAdmin = role === 'admin'
   const isRecepcion = role === 'recepcion'
   const isFacturacion = role === 'facturacion'
+  const isBioanalista = role === 'bioanalista'
   const isPatient = role === 'patient'
   const isStaff = !isPatient
 
@@ -206,6 +220,7 @@ function normalizeUser(rawUser, fallbackName, token) {
     isAdmin,
     isRecepcion,
     isFacturacion,
+    isBioanalista,
     isPatient,
     isStaff,
   }

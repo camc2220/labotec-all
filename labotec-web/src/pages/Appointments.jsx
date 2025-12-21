@@ -19,6 +19,7 @@ const statusOptions = ['Urgente', 'Rutinario', 'Normal']
 export default function Appointments() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin' || user?.isAdmin
+  const canManageAppointments = isAdmin || user?.isRecepcion
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -41,6 +42,7 @@ export default function Appointments() {
   })
 
   const isPatient = user?.role === 'patient'
+  const canEditAppointments = canManageAppointments || isPatient
   const endpoint = isPatient ? '/api/patients/me/appointments' : '/api/appointments'
 
   const availableTypeOptions = formData.type && !typeOptions.includes(formData.type)
@@ -71,10 +73,16 @@ export default function Appointments() {
   }, [endpoint, user])
 
   useEffect(() => {
-    if (user) fetchAvailability()
-  }, [user])
+    if (isAdmin) {
+      fetchAvailability()
+    } else {
+      setAvailability([])
+    }
+  }, [isAdmin, user])
 
   const openForm = item => {
+    if (!canEditAppointments) return
+
     if (item) {
       setFormData({
         patientId: item.patientId ?? user?.patientId ?? '',
@@ -106,6 +114,7 @@ export default function Appointments() {
 
   const handleFormSubmit = async e => {
     e.preventDefault()
+    if (!canEditAppointments) return
     setSaving(true)
     setFormError('')
     try {
@@ -154,7 +163,7 @@ export default function Appointments() {
   }
 
   const handleDelete = async item => {
-    if (isPatient) return
+    if (isPatient || !canManageAppointments) return
     const id = resolveEntityId(item)
     if (!id) return
     if (!window.confirm('¿Eliminar esta cita?')) return
@@ -303,24 +312,35 @@ export default function Appointments() {
       { key: 'type', header: 'Tipo' },
       { key: 'status', header: 'Estado' },
       { key: 'notes', header: 'Notas' },
-      {
-        key: 'actions',
-        header: 'Acciones',
-        render: row => (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">
-              {isPatient ? 'Modificar' : 'Editar'}
-            </button>
-            {!isPatient && (
-              <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">Eliminar</button>
-            )}
-          </div>
-        ),
-      },
+      ...(canEditAppointments
+        ? [
+            {
+              key: 'actions',
+              header: 'Acciones',
+              render: row => (
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">
+                    {isPatient ? 'Modificar' : 'Editar'}
+                  </button>
+                  {!isPatient && (
+                    <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              ),
+            },
+          ]
+        : []),
     ],
-    [isPatient],
+    [canEditAppointments, isPatient],
   )
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
+  const calendarSubtitle = isPatient
+    ? 'Consulta los detalles y horarios confirmados.'
+    : canManageAppointments
+      ? 'Crea, edita o elimina citas registradas.'
+      : 'Consulta las citas programadas y su estado.'
 
   const currentSlot = extractDayTimeFromDateTime(formData.scheduledAt)
   const currentRemainingSlots = getRemainingSlots(
@@ -342,14 +362,16 @@ export default function Appointments() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{isPatient ? 'Historial de citas' : 'Calendario de atención'}</h3>
-            <p className="text-sm text-gray-600">{isPatient ? 'Consulta los detalles y horarios confirmados.' : 'Crea, edita o elimina citas registradas.'}</p>
+            <p className="text-sm text-gray-600">{calendarSubtitle}</p>
           </div>
-          <button
-            onClick={() => openForm(null)}
-            className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-          >
-            {isPatient ? 'Agendar cita' : 'Agregar cita'}
-          </button>
+          {canEditAppointments && (
+            <button
+              onClick={() => openForm(null)}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+            >
+              {isPatient ? 'Agendar cita' : 'Agregar cita'}
+            </button>
+          )}
         </div>
 
         <div className="mt-4 space-y-3">

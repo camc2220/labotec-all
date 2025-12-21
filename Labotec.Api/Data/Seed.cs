@@ -20,7 +20,7 @@ public static class Seed
 
         await EnsureCreatedByNameColumnAsync(db);
 
-        var roles = new[] { "Admin", "Recepcion", "Facturacion", "Paciente" };
+        var roles = new[] { "Admin", "Recepcion", "Facturacion", "Bioanalista", "Paciente" };
 
         foreach (var r in roles)
         {
