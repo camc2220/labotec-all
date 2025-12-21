@@ -250,6 +250,21 @@ export default function Results() {
 
   const printRows = rows => {
     if (!rows || rows.length === 0) return
+    const singlePatient = rows.every(row => getPatientKey(row) === getPatientKey(rows[0]))
+    const patientLabel = isPatient
+      ? 'Mi cuenta'
+      : singlePatient
+        ? rows[0]?.patientName ?? rows[0]?.patientId ?? 'Paciente sin nombre'
+        : 'Varios pacientes'
+    const totalResults = rows.length
+    const uniqueTests = new Set(rows.map(row => row.testName ?? '').filter(Boolean)).size
+    const latestReleaseDate = rows.reduce((latest, row) => {
+      const release = row.releasedAt ? new Date(row.releasedAt) : null
+      if (!release || Number.isNaN(release.getTime())) return latest
+      if (!latest) return release
+      return release > latest ? release : latest
+    }, null)
+
     const title = isPatient
       ? 'Mis resultados'
       : rows.every(row => getPatientKey(row) === getPatientKey(rows[0]))
@@ -268,6 +283,18 @@ export default function Results() {
         { header: 'Registrado por', accessor: row => row.createdByName ?? 'Desconocido' },
         { header: 'Liberado', accessor: row => (row.releasedAt ? formatDateTime(row.releasedAt) : '') },
       ],
+      info: [
+        { label: 'Paciente', value: patientLabel },
+        { label: 'Resultados incluidos', value: `${totalResults} registro${totalResults === 1 ? '' : 's'}` },
+        uniqueTests
+          ? { label: 'Pruebas únicas', value: `${uniqueTests} prueba${uniqueTests === 1 ? '' : 's'}` }
+          : null,
+        latestReleaseDate
+          ? { label: 'Última liberación', value: formatDateTime(latestReleaseDate) }
+          : null,
+      ].filter(Boolean),
+      footerNote:
+        'Los resultados impresos no sustituyen la interpretación médica. Para aclaraciones comunícate con Labotec.',
       rows,
     })
   }
