@@ -62,6 +62,9 @@ export default function UserManagement() {
   const [updatingMap, setUpdatingMap] = useState({})
   const [resettingMap, setResettingMap] = useState({})
   const [deletingMap, setDeletingMap] = useState({})
+  const [editingId, setEditingId] = useState('')
+  const [editDrafts, setEditDrafts] = useState({})
+  const [savingEditMap, setSavingEditMap] = useState({})
 
   const resolveUserIdentifier = user => {
     if (!user) return undefined
@@ -92,9 +95,10 @@ export default function UserManagement() {
       user.fullName,
       user.fullname,
       user.displayName,
+      user.nombre,
+      user.Nombre,
       user.userName,
       user.username,
-      user.email,
       resolveUserIdentifier(user),
     ]
 
@@ -240,6 +244,78 @@ export default function UserManagement() {
     }
   }
 
+  const updateLocalNameAndEmail = (entityId, name, email) => {
+    setItems(prev =>
+      prev.map(item => (resolveUserIdentifier(item) === entityId ? { ...item, name, email } : item)),
+    )
+  }
+
+  const handleEditChange = (entityId, field, value) => {
+    setEditDrafts(prev => ({
+      ...prev,
+      [entityId]: { ...prev[entityId], [field]: value },
+    }))
+  }
+
+  const handleEditUser = row => {
+    if (!isAdmin) return
+    const entityId = resolveUserIdentifier(row)
+    if (!entityId) return
+
+    setEditingId(entityId)
+    setEditDrafts(prev => ({
+      ...prev,
+      [entityId]: {
+        name: row.name === 'Sin nombre' ? '' : row.name ?? '',
+        email: row.email ?? '',
+      },
+    }))
+    setError('')
+    setSuccessMessage('')
+  }
+
+  const handleCancelEdit = entityId => {
+    setEditingId('')
+    setEditDrafts(prev => {
+      const copy = { ...prev }
+      delete copy[entityId]
+      return copy
+    })
+  }
+
+  const handleSaveEdit = async row => {
+    if (!isAdmin) return
+    const entityId = resolveUserIdentifier(row)
+    if (!entityId) return
+    const draft = editDrafts[entityId] ?? { name: '', email: '' }
+    const payload = { name: draft.name.trim(), email: draft.email.trim() }
+
+    if (!payload.email) {
+      setError('El correo electrónico es obligatorio.')
+      return
+    }
+
+    setError('')
+    setSuccessMessage('')
+    setSavingEditMap(prev => ({ ...prev, [entityId]: true }))
+
+    try {
+      await api.put(`/api/users/${entityId}`, payload)
+      updateLocalNameAndEmail(entityId, payload.name || 'Sin nombre', payload.email)
+      setSuccessMessage('El usuario se actualizó correctamente.')
+      handleCancelEdit(entityId)
+    } catch (err) {
+      console.error(err)
+      setError('No pudimos actualizar al usuario. Intenta nuevamente más tarde.')
+    } finally {
+      setSavingEditMap(prev => {
+        const copy = { ...prev }
+        delete copy[entityId]
+        return copy
+      })
+    }
+  }
+
   const handleStatusChange = async (target, newStatus) => {
     if (!isAdmin) return
     const entityId = resolveUserIdentifier(target)
@@ -296,6 +372,64 @@ export default function UserManagement() {
     return [
       { key: 'name', header: 'Nombre' },
       { key: 'email', header: 'Correo electrónico' },
+      {
+        key: 'edit',
+        header: 'Editar',
+        render: row => {
+          const entityId = resolveEntityId(row)
+          const isEditing = editingId === entityId
+          const isSaving = !!savingEditMap[entityId]
+
+          if (isEditing) {
+            const draft = editDrafts[entityId] ?? { name: '', email: '' }
+            return (
+              <div className="flex flex-col gap-2 text-xs">
+                <input
+                  className="rounded border border-slate-300 px-2 py-1"
+                  value={draft.name}
+                  onChange={e => handleEditChange(entityId, 'name', e.target.value)}
+                  placeholder="Nombre"
+                />
+                <input
+                  type="email"
+                  className="rounded border border-slate-300 px-2 py-1"
+                  value={draft.email}
+                  onChange={e => handleEditChange(entityId, 'email', e.target.value)}
+                  placeholder="Correo electrónico"
+                />
+                <div className="flex gap-2">
+                  <button
+                    className="font-semibold text-emerald-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                    onClick={() => handleSaveEdit(row)}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button
+                    className="font-semibold text-slate-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+                    onClick={() => handleCancelEdit(entityId)}
+                    disabled={isSaving}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )
+          }
+
+          const isBusy =
+            !!updatingMap[entityId] || !!resettingMap[entityId] || !!deletingMap[entityId] || !!savingEditMap[entityId]
+          return (
+            <button
+              className="text-xs font-semibold text-sky-700 hover:underline disabled:cursor-not-allowed disabled:text-slate-400"
+              onClick={() => handleEditUser(row)}
+              disabled={isBusy}
+            >
+              Editar
+            </button>
+          )
+        },
+      },
       {
         key: 'role',
         header: 'Rol actual',
@@ -401,7 +535,7 @@ export default function UserManagement() {
         },
       },
     ]
-  }, [isAdmin, resettingMap, updatingMap, deletingMap])
+  }, [deletingMap, editDrafts, editingId, isAdmin, resettingMap, savingEditMap, updatingMap])
 
   const panelClass = 'rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm'
 
