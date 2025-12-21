@@ -14,14 +14,20 @@ import PatientDashboard from './pages/PatientDashboard'
 import AppIndexRedirect from './components/AppIndexRedirect'
 import UserManagement from './pages/UserManagement'
 import Profile from './pages/Profile'
-//jhjkhk
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route index element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/app" element={<PrivateRoute><Layout /></PrivateRoute>}>
+        <Route
+          path="/app"
+          element={(
+            <PrivateRoute>
+              <Layout />
+            </PrivateRoute>
+          )}
+        >
           <Route index element={<AppIndexRedirect />} />
           <Route path="dashboard" element={<PatientDashboard />} />
           <Route path="users" element={<UserManagement />} />
