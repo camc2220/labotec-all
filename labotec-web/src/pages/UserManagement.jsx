@@ -56,6 +56,9 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [newUser, setNewUser] = useState({ userName: '', email: '', role: 'patient', password: '' })
   const [updatingMap, setUpdatingMap] = useState({})
   const [resettingMap, setResettingMap] = useState({})
   const [deletingMap, setDeletingMap] = useState({})
@@ -184,6 +187,10 @@ export default function UserManagement() {
     const entityId = resolveUserIdentifier(target)
     if (!entityId) return
 
+    const nameForConfirm = resolveUserName(target)
+    const confirmed = window.confirm(`¿Eliminar al usuario "${nameForConfirm}"? Esta acción no se puede deshacer.`)
+    if (!confirmed) return
+
     setError('')
     setSuccessMessage('')
     setDeletingMap(prev => ({ ...prev, [entityId]: true }))
@@ -201,6 +208,35 @@ export default function UserManagement() {
         delete copy[entityId]
         return copy
       })
+    }
+  }
+
+  const handleCreateUser = async e => {
+    e.preventDefault()
+    if (!isAdmin || creating) return
+
+    setError('')
+    setSuccessMessage('')
+    setCreating(true)
+
+    const payload = {
+      userName: newUser.userName.trim(),
+      email: newUser.email.trim(),
+      password: newUser.password.trim() || undefined,
+      roles: [toApiRole(newUser.role)],
+    }
+
+    try {
+      const res = await api.post('/api/users', payload)
+      setItems(prev => [normalizeUsers([res.data])[0], ...prev])
+      setSuccessMessage('Usuario creado correctamente.')
+      setNewUser({ userName: '', email: '', role: 'patient', password: '' })
+      setShowCreateForm(false)
+    } catch (err) {
+      console.error(err)
+      setError('No pudimos crear al usuario. Verifica los datos e intenta nuevamente.')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -394,10 +430,87 @@ export default function UserManagement() {
             <h3 className="text-lg font-semibold text-gray-900">Usuarios registrados</h3>
             <p className="text-sm text-gray-600">Actualiza los roles para garantizar el acceso correcto a cada módulo.</p>
           </div>
-          <button onClick={fetchUsers} className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700" disabled={loading}>
-            Actualizar lista
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCreateForm(prev => !prev)}
+              className="rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50"
+            >
+              {showCreateForm ? 'Cerrar' : 'Agregar usuario'}
+            </button>
+            <button onClick={fetchUsers} className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700" disabled={loading}>
+              Actualizar lista
+            </button>
+          </div>
         </div>
+        {showCreateForm && (
+          <form onSubmit={handleCreateUser} className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex flex-col gap-1 text-sm text-gray-700">
+              Nombre de usuario
+              <input
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none"
+                value={newUser.userName}
+                onChange={e => setNewUser(prev => ({ ...prev, userName: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-gray-700">
+              Correo electrónico
+              <input
+                type="email"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none"
+                value={newUser.email}
+                onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-gray-700">
+              Contraseña inicial (opcional)
+              <input
+                type="password"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none"
+                value={newUser.password}
+                onChange={e => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Se usará la genérica si se deja en blanco"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-gray-700">
+              Rol
+              <select
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-sky-500 focus:outline-none"
+                value={newUser.role}
+                onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value }))}
+              >
+                {ROLE_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="sm:col-span-2 lg:col-span-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                onClick={() => {
+                  setShowCreateForm(false)
+                  setNewUser({ userName: '', email: '', role: 'patient', password: '' })
+                  setError('')
+                  setSuccessMessage('')
+                }}
+                disabled={creating}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                disabled={creating}
+              >
+                {creating ? 'Creando...' : 'Crear usuario'}
+              </button>
+            </div>
+          </form>
+        )}
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {successMessage && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</div>}
