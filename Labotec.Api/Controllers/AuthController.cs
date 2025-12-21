@@ -245,6 +245,12 @@ namespace Labotec.Api.Controllers
                 return BadRequest("El correo electrónico es obligatorio.");
             }
 
+            var documentId = dto.DocumentId?.Trim();
+            if (!IsValidDocumentId(documentId))
+            {
+                return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
+            }
+
             var derivedUserName = DeriveUserNameFromEmail(email);
             if (string.IsNullOrWhiteSpace(derivedUserName))
             {
@@ -273,7 +279,7 @@ namespace Labotec.Api.Controllers
             var patient = new Patient
             {
                 FullName = dto.FullName,
-                DocumentId = dto.DocumentId,
+                DocumentId = documentId!,
                 BirthDate = dto.BirthDate,
                 Email = email,
                 Phone = dto.Phone,
