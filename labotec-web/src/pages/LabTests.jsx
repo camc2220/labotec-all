@@ -17,7 +17,14 @@ export default function LabTests() {
   const [editingItem, setEditingItem] = useState(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
-  const [formData, setFormData] = useState({ code: '', name: '', defaultUnit: '', defaultPrice: '', active: true })
+  const [formData, setFormData] = useState({
+    code: '',
+    name: '',
+    defaultUnit: '',
+    defaultPrice: '',
+    referenceValue: '',
+    active: true,
+  })
 
   const canView = user?.isAdmin || user?.isFacturacion || user?.isRecepcion
   const canEdit = user?.isAdmin
@@ -48,11 +55,12 @@ export default function LabTests() {
         name: item.name ?? item.Name ?? '',
         defaultUnit: item.defaultUnit ?? item.DefaultUnit ?? '',
         defaultPrice: item.defaultPrice ?? item.DefaultPrice ?? '',
+        referenceValue: item.referenceValue ?? item.ReferenceValue ?? '',
         active: Boolean(item.active ?? item.Active ?? true),
       })
       setEditingItem(item)
     } else {
-      setFormData({ code: '', name: '', defaultUnit: '', defaultPrice: '', active: true })
+      setFormData({ code: '', name: '', defaultUnit: '', defaultPrice: '', referenceValue: '', active: true })
       setEditingItem(null)
     }
     setShowForm(true)
@@ -69,6 +77,7 @@ export default function LabTests() {
         name: formData.name,
         defaultUnit: formData.defaultUnit || null,
         defaultPrice: formData.defaultPrice === '' ? null : Number(formData.defaultPrice),
+        referenceValue: formData.referenceValue || null,
         active: Boolean(formData.active),
       }
       if (editingItem) {
@@ -93,6 +102,7 @@ export default function LabTests() {
       { key: 'code', header: 'Código' },
       { key: 'name', header: 'Nombre' },
       { key: 'defaultUnit', header: 'Unidad' },
+      { key: 'referenceValue', header: 'Valor de referencia', render: row => row.referenceValue ?? row.ReferenceValue ?? '—' },
       {
         key: 'defaultPrice',
         header: 'Precio',
@@ -199,6 +209,15 @@ export default function LabTests() {
                   placeholder="Ej. 500"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Valor de referencia</label>
+              <input
+                value={formData.referenceValue}
+                onChange={e => setFormData({ ...formData, referenceValue: e.target.value })}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+                placeholder="Ej. 70-99"
+              />
             </div>
             <div className="flex items-center gap-2">
               <input
