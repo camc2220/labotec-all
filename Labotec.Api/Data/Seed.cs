@@ -3,6 +3,8 @@ using Labotec.Api.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Data.Common;
 
 namespace Labotec.Api.Data;
 
@@ -14,6 +16,8 @@ public static class Seed
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+
+        await EnsureCreatedByNameColumnAsync(db);
 
         var roles = new[] { "Admin", "Recepcion", "Facturacion", "Paciente" };
 
@@ -114,5 +118,28 @@ public static class Seed
         {
             await db.SaveChangesAsync();
         }
+    }
+
+    private static async Task EnsureCreatedByNameColumnAsync(AppDbContext db)
+    {
+        await using var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        await using var checkCmd = connection.CreateCommand();
+        checkCmd.CommandText = @"SELECT COUNT(*)
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'LabResults'
+  AND COLUMN_NAME = 'CreatedByName';";
+
+        var exists = Convert.ToInt32(await checkCmd.ExecuteScalarAsync()) > 0;
+        if (exists)
+        {
+            return;
+        }
+
+        await using var alterCmd = connection.CreateCommand();
+        alterCmd.CommandText = "ALTER TABLE `LabResults` ADD COLUMN `CreatedByName` varchar(160) NOT NULL DEFAULT '' AFTER `Unit`;";
+        await alterCmd.ExecuteNonQueryAsync();
     }
 }
