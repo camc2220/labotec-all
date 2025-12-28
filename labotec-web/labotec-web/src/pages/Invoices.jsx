@@ -25,8 +25,12 @@ const formatDate = value => {
 
 const getLabTestId = test => test?.id ?? test?.Id ?? ''
 const getLabTestPrice = test => Number(test?.defaultPrice ?? test?.DefaultPrice ?? 0)
-const formatMoney = value => Number(value ?? 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
+const formatMoney = value => {
+  return Number(value ?? 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
 export default function Invoices() {
   const { user } = useAuth()
   const [items, setItems] = useState([])
