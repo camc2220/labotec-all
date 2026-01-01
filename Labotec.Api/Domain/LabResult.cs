@@ -8,7 +8,6 @@ public class LabResult
     public string TestName { get; set; } = default!;
     public string ResultValue { get; set; } = default!;
     public string Unit { get; set; } = "";
-    public string CreatedByName { get; set; } = string.Empty;
     public DateTime ReleasedAt { get; set; } = DateTime.UtcNow;
     public string? PdfUrl { get; set; }
 }

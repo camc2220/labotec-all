@@ -1,11 +1,7 @@
-/*using System.Security.Claims;
-using Labotec.Api.Auth;
-using Labotec.Api.Common;
 using Labotec.Api.Data;
+using Labotec.Api.Domain;
 using Labotec.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,35 +13,19 @@ namespace Labotec.Api.Controllers;
 public class PatientsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly UserManager<IdentityUser> _userManager;
-
-    public PatientsController(AppDbContext db, UserManager<IdentityUser> userManager)
-    {
-        _db = db;
-        _userManager = userManager;
-    }
+    public PatientsController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<PatientReadDto>>> Get([FromQuery] string? q, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? sortBy = null, [FromQuery] string sortDir = "asc")
+    public async Task<ActionResult<IEnumerable<PatientReadDto>>> Get([FromQuery] string? q)
     {
-        var query = _db.Patients.AsNoTracking().AsQueryable();
-
-        var currentPatientId = User.GetPatientId();
-        if (currentPatientId.HasValue)
-        {
-            query = query.Where(p => p.Id == currentPatientId.Value);
-        }
+        var query = _db.Patients.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(q))
-            query = query.Where(p => p.FullName.Contains(q) || (p.DocumentId != null && p.DocumentId.Contains(q)));
-
-        var total = await query.CountAsync();
+            query = query.Where(p => p.FullName.Contains(q) || p.DocumentId.Contains(q));
         var data = await query
-            .ApplyOrdering(sortBy, sortDir)
-            .ApplyPaging(page, pageSize)
-            .Select(p => new PatientReadDto(p.Id, p.FullName, p.DocumentId, p.BirthDate, p.Email, p.Phone, p.UserId))
+            .OrderBy(p => p.FullName)
+            .Select(p => new PatientReadDto(p.Id, p.FullName, p.DocumentId, p.BirthDate, p.Email, p.Phone))
             .ToListAsync();
-
-        return Ok(new PagedResult<PatientReadDto>(data, page, pageSize, total));
+        return Ok(data);
     }
 
     [HttpGet("{id:guid}")]
@@ -53,16 +33,13 @@ public class PatientsController : ControllerBase
     {
         var p = await _db.Patients.FindAsync(id);
         if (p is null) return NotFound();
-
-        var currentPatientId = User.GetPatientId();
-        if (currentPatientId.HasValue && p.Id != currentPatientId.Value) return Forbid();
-        return new PatientReadDto(p.Id, p.FullName, p.DocumentId, p.BirthDate, p.Email, p.Phone, p.UserId);
+        return new PatientReadDto(p.Id, p.FullName, p.DocumentId, p.BirthDate, p.Email, p.Phone);
     }
 
     [HttpPost]
     public async Task<ActionResult<PatientReadDto>> Create([FromBody] PatientCreateDto dto)
     {
-        var entity = new Domain.Patient
+        var entity = new Patient
         {
             FullName = dto.FullName,
             DocumentId = dto.DocumentId,
@@ -70,115 +47,10 @@ public class PatientsController : ControllerBase
             Email = dto.Email,
             Phone = dto.Phone
         };
-
-        IdentityUser? user = null;
-
-        if (!string.IsNullOrWhiteSpace(dto.UserName) && !string.IsNullOrWhiteSpace(dto.Password))
-        {
-            user = new IdentityUser
-            {
-                UserName = dto.UserName,
-                Email = dto.Email
-            };
-
-            var identityResult = await _userManager.CreateAsync(user, dto.Password);
-            if (!identityResult.Succeeded)
-            {
-                return BadRequest(identityResult.Errors);
-            }
-
-            var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
-            if (!roleResult.Succeeded)
-            {
-                await _userManager.DeleteAsync(user);
-                return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
-            }
-
-            entity.UserId = user.Id;
-        }
-
         _db.Patients.Add(entity);
-
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch
-        {
-            if (user is not null)
-            {
-                await _userManager.DeleteAsync(user);
-            }
-
-            throw;
-        }
-
-        if (user is not null)
-        {
-            // AQUÍ ES CLAVE: Usamos AppClaims.PatientId que ahora vale "patientId" (minúscula)
-            var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, entity.Id.ToString()));
-            if (!claimResult.Succeeded)
-            {
-                _db.Patients.Remove(entity);
-                await _db.SaveChangesAsync();
-                await _userManager.DeleteAsync(user);
-                return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
-            }
-        }
-
-        var result = new PatientReadDto(entity.Id, entity.FullName, entity.DocumentId, entity.BirthDate, entity.Email, entity.Phone, entity.UserId);
-        return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpPost("{id:guid}/create-user")]
-    public async Task<ActionResult> CreateUser(Guid id)
-    {
-        var patient = await _db.Patients.FindAsync(id);
-        if (patient is null) return NotFound();
-        if (!string.IsNullOrWhiteSpace(patient.UserId))
-        {
-            return BadRequest(new { message = "El paciente ya tiene un usuario asignado." });
-        }
-
-        var userName = !string.IsNullOrWhiteSpace(patient.Email)
-            ? patient.Email!
-            : (!string.IsNullOrWhiteSpace(patient.DocumentId) ? patient.DocumentId : $"paciente-{Guid.NewGuid():N}");
-
-                const string tempPassword = "Arriba1@";
-
-        var user = new IdentityUser
-        {
-            UserName = userName,
-            Email = patient.Email
-        };
-
-        var createResult = await _userManager.CreateAsync(user, tempPassword);
-        if (!createResult.Succeeded)
-        {
-            return BadRequest(createResult.Errors);
-        }
-
-        var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
-        if (!roleResult.Succeeded)
-        {
-            await _userManager.DeleteAsync(user);
-            return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
-        }
-
-        patient.UserId = user.Id;
         await _db.SaveChangesAsync();
-
-        var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, patient.Id.ToString()));
-        if (!claimResult.Succeeded)
-        {
-            patient.UserId = null;
-            await _db.SaveChangesAsync();
-            await _userManager.DeleteAsync(user);
-            return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
-        }
-
-        return Ok(new { userId = user.Id, userName = user.UserName, password = tempPassword });
+        var result = new PatientReadDto(entity.Id, entity.FullName, entity.DocumentId, entity.BirthDate, entity.Email, entity.Phone);
+        return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
     }
 
     [HttpPut("{id:guid}")]
@@ -186,22 +58,10 @@ public class PatientsController : ControllerBase
     {
         var p = await _db.Patients.FindAsync(id);
         if (p is null) return NotFound();
-
-        var currentPatientId = User.GetPatientId();
-        if (currentPatientId.HasValue && p.Id != currentPatientId.Value) return Forbid();
-
-        var documentId = dto.DocumentId?.Trim();
-        if (!IsValidDocumentId(documentId))
-        {
-            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
-        }
-
         p.FullName = dto.FullName;
-        p.DocumentId = documentId!;
         p.BirthDate = dto.BirthDate;
         p.Email = dto.Email;
         p.Phone = dto.Phone;
-
         await _db.SaveChangesAsync();
         return NoContent();
     }
@@ -211,321 +71,8 @@ public class PatientsController : ControllerBase
     {
         var p = await _db.Patients.FindAsync(id);
         if (p is null) return NotFound();
-
-        var currentPatientId = User.GetPatientId();
-        if (currentPatientId.HasValue && p.Id != currentPatientId.Value) return Forbid();
-
         _db.Remove(p);
         await _db.SaveChangesAsync();
-
-        if (!string.IsNullOrWhiteSpace(p.UserId))
-        {
-            var user = await _userManager.FindByIdAsync(p.UserId);
-            if (user is not null)
-            {
-                await _userManager.DeleteAsync(user);
-            }
-        }
         return NoContent();
-    }
-}*/
-
-using System.Linq;
-using System.Security.Claims;
-using Labotec.Api.Auth;
-using Labotec.Api.Common;
-using Labotec.Api.Data;
-using Labotec.Api.DTOs;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-
-namespace Labotec.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-[Authorize]
-public class PatientsController : ControllerBase
-{
-    private readonly AppDbContext _db;
-    private readonly UserManager<IdentityUser> _userManager;
-
-    public PatientsController(AppDbContext db, UserManager<IdentityUser> userManager)
-    {
-        _db = db;
-        _userManager = userManager;
-    }
-
-    private bool IsStaffRead() =>
-        User.IsInRole("Admin") ||
-        User.IsInRole("Recepcion") ||
-        User.IsInRole("Facturacion") ||
-        User.IsInRole("Bioanalista");
-
-    private bool IsStaffWrite() =>
-        User.IsInRole("Admin") || User.IsInRole("Recepcion");
-
-    [HttpGet]
-    public async Task<ActionResult<PagedResult<PatientReadDto>>> Get(
-        [FromQuery] string? q,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
-        [FromQuery] string? sortBy = null,
-        [FromQuery] string sortDir = "asc")
-    {
-        var query = _db.Patients.AsNoTracking().AsQueryable();
-
-        var currentPatientId = User.GetPatientId();
-
-        // ✅ Staff (aunque también tenga patientId) puede ver listados
-        if (!IsStaffRead())
-        {
-            // ✅ No-staff: solo paciente, y SOLO si trae patientId
-            if (!User.IsInRole("Paciente")) return Forbid();
-            if (!currentPatientId.HasValue) return Forbid();
-
-            query = query.Where(p => p.Id == currentPatientId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(q))
-        {
-            query = query.Where(p =>
-                p.FullName.Contains(q) ||
-                (p.DocumentId != null && p.DocumentId.Contains(q)));
-        }
-
-        var total = await query.CountAsync();
-
-        var data = await query
-            .ApplyOrdering(sortBy, sortDir)
-            .ApplyPaging(page, pageSize)
-            .Select(p => new PatientReadDto(
-                p.Id,
-                p.FullName,
-                p.DocumentId,
-                p.BirthDate,
-                p.Email,
-                p.Phone,
-                p.UserId))
-            .ToListAsync();
-
-        return Ok(new PagedResult<PatientReadDto>(data, page, pageSize, total));
-    }
-
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<PatientReadDto>> GetOne(Guid id)
-    {
-        var p = await _db.Patients.FindAsync(id);
-        if (p is null) return NotFound();
-
-        // ✅ Staff puede ver cualquiera
-        if (!IsStaffRead())
-        {
-            // ✅ No-staff: solo paciente a sí mismo (si trae patientId)
-            if (!User.IsInRole("Paciente")) return Forbid();
-
-            var currentPatientId = User.GetPatientId();
-            if (!currentPatientId.HasValue) return Forbid();
-            if (p.Id != currentPatientId.Value) return Forbid();
-        }
-
-        return new PatientReadDto(p.Id, p.FullName, p.DocumentId, p.BirthDate, p.Email, p.Phone, p.UserId);
-    }
-
-    // ✅ FIX CRÍTICO: crear pacientes SOLO staff (Admin/Recepcion)
-    [HttpPost]
-    [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<PatientReadDto>> Create([FromBody] PatientCreateDto dto)
-    {
-        var documentId = dto.DocumentId?.Trim();
-        if (!IsValidDocumentId(documentId))
-        {
-            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
-        }
-
-        var entity = new Domain.Patient
-        {
-            FullName = dto.FullName,
-            DocumentId = documentId!,
-            BirthDate = dto.BirthDate,
-            Email = dto.Email,
-            Phone = dto.Phone
-        };
-
-        IdentityUser? user = null;
-
-        if (!string.IsNullOrWhiteSpace(dto.UserName) && !string.IsNullOrWhiteSpace(dto.Password))
-        {
-            user = new IdentityUser
-            {
-                UserName = dto.UserName,
-                Email = dto.Email
-            };
-
-            var identityResult = await _userManager.CreateAsync(user, dto.Password);
-            if (!identityResult.Succeeded)
-            {
-                return BadRequest(identityResult.Errors);
-            }
-
-            var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
-            if (!roleResult.Succeeded)
-            {
-                await _userManager.DeleteAsync(user);
-                return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
-            }
-
-            entity.UserId = user.Id;
-        }
-
-        _db.Patients.Add(entity);
-
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch
-        {
-            if (user is not null)
-            {
-                await _userManager.DeleteAsync(user);
-            }
-            throw;
-        }
-
-        if (user is not null)
-        {
-            // Claim: "patientId" (minúscula) según AppClaims
-            var claimResult = await _userManager.AddClaimAsync(
-                user,
-                new Claim(AppClaims.PatientId, entity.Id.ToString()));
-
-            if (!claimResult.Succeeded)
-            {
-                _db.Patients.Remove(entity);
-                await _db.SaveChangesAsync();
-                await _userManager.DeleteAsync(user);
-                return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
-            }
-        }
-
-        var result = new PatientReadDto(entity.Id, entity.FullName, entity.DocumentId, entity.BirthDate, entity.Email, entity.Phone, entity.UserId);
-        return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
-    }
-
-    [Authorize(Roles = "Admin")]
-    [HttpPost("{id:guid}/create-user")]
-    public async Task<ActionResult> CreateUser(Guid id)
-    {
-        var patient = await _db.Patients.FindAsync(id);
-        if (patient is null) return NotFound();
-
-        if (!string.IsNullOrWhiteSpace(patient.UserId))
-        {
-            return BadRequest(new { message = "El paciente ya tiene un usuario asignado." });
-        }
-
-        var userName = !string.IsNullOrWhiteSpace(patient.Email)
-            ? patient.Email!
-            : (!string.IsNullOrWhiteSpace(patient.DocumentId) ? patient.DocumentId : $"paciente-{Guid.NewGuid():N}");
-
-        const string tempPassword = "Arriba1@";
-
-        var user = new IdentityUser
-        {
-            UserName = userName,
-            Email = patient.Email
-        };
-
-        var createResult = await _userManager.CreateAsync(user, tempPassword);
-        if (!createResult.Succeeded)
-        {
-            return BadRequest(createResult.Errors);
-        }
-
-        var roleResult = await _userManager.AddToRoleAsync(user, "Paciente");
-        if (!roleResult.Succeeded)
-        {
-            await _userManager.DeleteAsync(user);
-            return StatusCode(StatusCodes.Status500InternalServerError, roleResult.Errors);
-        }
-
-        patient.UserId = user.Id;
-        await _db.SaveChangesAsync();
-
-        var claimResult = await _userManager.AddClaimAsync(user, new Claim(AppClaims.PatientId, patient.Id.ToString()));
-        if (!claimResult.Succeeded)
-        {
-            patient.UserId = null;
-            await _db.SaveChangesAsync();
-            await _userManager.DeleteAsync(user);
-            return StatusCode(StatusCodes.Status500InternalServerError, claimResult.Errors);
-        }
-
-        return Ok(new { userId = user.Id, userName = user.UserName, password = tempPassword });
-    }
-
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] PatientUpdateDto dto)
-    {
-        var p = await _db.Patients.FindAsync(id);
-        if (p is null) return NotFound();
-
-        // ✅ Staff (Admin/Recepcion) puede editar cualquiera.
-        // ✅ Paciente solo puede editarse a sí mismo y SOLO si trae patientId.
-        if (!IsStaffWrite())
-        {
-            if (!User.IsInRole("Paciente")) return Forbid();
-
-            var currentPatientId = User.GetPatientId();
-            if (!currentPatientId.HasValue) return Forbid();
-            if (p.Id != currentPatientId.Value) return Forbid();
-        }
-
-        var documentId = dto.DocumentId?.Trim();
-        if (!IsValidDocumentId(documentId))
-        {
-            return BadRequest("La cédula/ID debe contener exactamente 11 dígitos.");
-        }
-
-        p.FullName = dto.FullName;
-        p.DocumentId = documentId!;
-        p.BirthDate = dto.BirthDate;
-        p.Email = dto.Email;
-        p.Phone = dto.Phone;
-
-        await _db.SaveChangesAsync();
-        return NoContent();
-    }
-
-    // ✅ Recomendado: borrar pacientes SOLO staff
-    [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        var p = await _db.Patients.FindAsync(id);
-        if (p is null) return NotFound();
-
-        _db.Remove(p);
-        await _db.SaveChangesAsync();
-
-        if (!string.IsNullOrWhiteSpace(p.UserId))
-        {
-            var user = await _userManager.FindByIdAsync(p.UserId);
-            if (user is not null)
-            {
-                await _userManager.DeleteAsync(user);
-            }
-        }
-
-        return NoContent();
-    }
-
-    private static bool IsValidDocumentId(string? documentId)
-    {
-        if (string.IsNullOrWhiteSpace(documentId)) return false;
-        return documentId.All(char.IsDigit) && documentId.Length == 11;
     }
 }

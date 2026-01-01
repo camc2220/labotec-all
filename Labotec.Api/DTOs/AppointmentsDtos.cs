@@ -1,1 +1,5 @@
-namespace Labotec.Api.DTOs; public record AppointmentCreateDto(Guid PatientId, DateTime ScheduledAt, string Type, string? Notes); public record AppointmentReadDto(Guid Id, Guid PatientId, string PatientName, DateTime ScheduledAt, string Type, string Status, string? Notes); public record AppointmentUpdateDto(DateTime ScheduledAt, string Type, string Status, string? Notes);
+namespace Labotec.Api.DTOs;
+
+public record AppointmentCreateDto(Guid PatientId, DateTime ScheduledAt, string Type, string? Notes);
+public record AppointmentReadDto(Guid Id, Guid PatientId, string PatientName, DateTime ScheduledAt, string Type, string Status, string? Notes);
+public record AppointmentUpdateDto(DateTime ScheduledAt, string Type, string Status, string? Notes);

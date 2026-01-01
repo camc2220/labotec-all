@@ -1,9 +1,6 @@
-
 using Labotec.Api.Auth;
 using Labotec.Api.Data;
-using Labotec.Api.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -13,198 +10,107 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// =======================
-// SERILOG
-// =======================
+// Serilog
 builder.Host.UseSerilog((ctx, lc) => lc
     .ReadFrom.Configuration(ctx.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console());
 
-// =======================
-// DB CONTEXT (MySQL)
-// =======================
+// DB MySQL
 var cs = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseMySql(cs, ServerVersion.AutoDetect(cs)));
-
-// =======================
-// IDENTITY
-// =======================
-builder.Services
-    .AddIdentity<IdentityUser, IdentityRole>()
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
-
-// Evitar redirección a login HTML (devolver 401/403 en API)
-builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Events.OnRedirectToLogin = context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        return Task.CompletedTask;
-    };
-
-    options.Events.OnRedirectToAccessDenied = context =>
-    {
-        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        return Task.CompletedTask;
-    };
+    opt.UseMySql(cs, ServerVersion.AutoDetect(cs));
 });
 
-// =======================
-// JWT
-// =======================
-builder.Services.AddScoped<JwtTokenService>();
+// Identity + EF
+builder.Services.AddIdentity<IdentityUser, IdentityRole>(opt =>
+{
+    opt.Password.RequiredLength = 8;
+    opt.Password.RequireNonAlphanumeric = false;
+})
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
+// JWT
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtSettings>(jwtSection);
-
-var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
-
-// Usar JWT como esquema por defecto
-builder.Services
-    .AddAuthentication(options =>
+var key = Encoding.UTF8.GetBytes(jwtSection["Key"]!); // >= 16 bytes
+builder.Services.AddAuthentication(opts =>
+{
+    opts.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    opts.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(opts =>
+{
+    opts.TokenValidationParameters = new TokenValidationParameters
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.SaveToken = true;
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidIssuer = jwtSection["Issuer"],
+        ValidAudience = jwtSection["Audience"],
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ClockSkew = TimeSpan.FromMinutes(1)
+    };
+});
+builder.Services.AddScoped<JwtTokenService>();
 
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidIssuer = jwtSection["Issuer"],
-            ValidAudience = jwtSection["Audience"],
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            ClockSkew = TimeSpan.FromMinutes(1)
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"JWT error: {context.Exception.Message}");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine($"JWT OK para usuario: {context.Principal?.Identity?.Name}");
-                return Task.CompletedTask;
-            }
-        };
-    });
-
-// =======================
 // CORS
-// =======================
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.AddCors(opt =>
 {
-    opt.AddPolicy("AppCors", p =>
-        p.AllowAnyHeader()
-         .AllowAnyMethod()
-         .AllowAnyOrigin());
+    opt.AddPolicy("AppCors", policy =>
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials());
 });
 
-// =======================
-// CONTROLLERS + SWAGGER
-// =======================
+// Controllers
 builder.Services.AddControllers();
+
+// Swagger + Bearer
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Labotec API", Version = "v1" });
+    var securityScheme = new OpenApiSecurityScheme
     {
-        Title = "Labotec API",
-        Version = "v1"
-    });
-
-    var jwtSecurityScheme = new OpenApiSecurityScheme
-    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
-        Name = "Authorization",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Description = "Introduce solo el token JWT (sin la palabra 'Bearer').",
-        Reference = new OpenApiReference
-        {
-            Id = "Bearer",
-            Type = ReferenceType.SecurityScheme
-        }
+        Description = "JWT Bearer token"
     };
-
-    // Definimos el esquema con la clave "Bearer"
-    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
-
-    // Le decimos a Swagger que todos los endpoints usan este esquema
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        { jwtSecurityScheme, Array.Empty<string>() }
+    c.AddSecurityDefinition("Bearer", securityScheme);
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+        { securityScheme, Array.Empty<string>() }
     });
 });
 
-// =======================
-// STORAGE (File o Azure)
-// =======================
-var provider = builder.Configuration
-    .GetValue<string>("Storage:Provider")?
-    .ToLowerInvariant() ?? "file";
-
-if (provider == "azure")
-{
-    builder.Services.AddScoped<IStorageService, AzureBlobService>();
-}
-else
-{
-    builder.Services.AddScoped<IStorageService, FileStorageService>();
-}
-
 var app = builder.Build();
 
-// =======================
-// PIPELINE HTTP
-// =======================
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseSerilogRequestLogging();
-
 app.UseHttpsRedirection();
-app.UseStaticFiles();
-
 app.UseCors("AppCors");
-
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// =======================
-// MIGRACIONES + SEED
-// =======================
+// Seed básico (usuarios/roles, migraciones)
 using (var scope = app.Services.CreateScope())
 {
-    var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-    var pending = await ctx.Database.GetPendingMigrationsAsync();
-    if (pending.Any())
-    {
-        Console.WriteLine($"Aplicando {pending.Count()} migraciones pendientes...");
-        await ctx.Database.MigrateAsync();
-        Console.WriteLine("Migraciones aplicadas correctamente.");
-    }
-    else
-    {
-        Console.WriteLine("No hay migraciones pendientes. La base de datos está actualizada.");
-    }
-
-    await Seed.Run(scope.ServiceProvider);
+    var sp = scope.ServiceProvider;
+    await Seed.Run(sp);
 }
 
 app.Run();
