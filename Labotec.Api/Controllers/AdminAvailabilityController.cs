@@ -33,12 +33,12 @@ public class AdminAvailabilityController : ControllerBase
         int Remaining
     );
 
-   // private string GetCurrentUserId()
+    private string GetCurrentUserId()
         => User.FindFirstValue(ClaimTypes.NameIdentifier)
            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
            ?? string.Empty;
 
-  //  private async Task<int> CountBookedAsync(DateTime startUtc, DateTime endUtc)
+    private async Task<int> CountBookedAsync(DateTime startUtc, DateTime endUtc)
     {
         return await _db.Appointments.AsNoTracking()
             .Where(a => a.ScheduledAt >= startUtc && a.ScheduledAt < endUtc)
