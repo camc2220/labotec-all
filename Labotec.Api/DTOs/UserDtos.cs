@@ -1,9 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-
 namespace Labotec.Api.DTOs;
 
+/// <summary>
+/// Información legible de un usuario para los paneles administrativos.
+/// </summary>
+/// <param name="Id">Identificador interno del usuario.</param>
+/// <param name="UserName">Nombre de usuario.</param>
+/// <param name="Email">Correo registrado.</param>
+/// <param name="Roles">Listado de roles asignados.</param>
+/// <param name="IsLocked">Indica si el usuario está bloqueado actualmente.</param>
+/// <param name="LockoutEnd">Fecha en la que termina el bloqueo (si aplica).</param>
 public record UserReadDto(
     string Id,
     string? UserName,
@@ -12,21 +17,44 @@ public record UserReadDto(
     bool IsLocked,
     DateTimeOffset? LockoutEnd);
 
+/// <summary>
+/// Solicitud para crear un nuevo usuario desde el panel administrativo.
+/// </summary>
+/// <param name="UserName">Nombre de usuario.</param>
+/// <param name="Email">Correo electrónico.</param>
+/// <param name="Password">Contraseña inicial.</param>
+/// <param name="Roles">Roles que se asignarán al usuario. Si no se especifican no se asigna ninguno.</param>
 public record UserCreateDto(
-    [param: Required, StringLength(120, MinimumLength = 3)] string UserName,
-    [param: Required, EmailAddress, StringLength(120)] string Email,
-    [param: Required, StringLength(100, MinimumLength = 6)] string Password,
+    string UserName,
+    string Email,
+    string Password,
     IReadOnlyCollection<string>? Roles);
 
+/// <summary>
+/// Solicitud para modificar datos básicos de un usuario.
+/// </summary>
+/// <param name="UserName">Nuevo nombre de usuario (opcional).</param>
+/// <param name="Email">Nuevo correo electrónico (opcional).</param>
+/// <param name="Roles">Lista completa de roles que debe poseer el usuario (opcional).</param>
+/// <param name="Lockout">True para bloquear, false para desbloquear, null para mantener el estado.</param>
 public record UserUpdateDto(
-    [param: StringLength(120, MinimumLength = 3)] string? UserName,
-    [param: EmailAddress, StringLength(120)] string? Email,
+    string? UserName,
+    string? Email,
     IReadOnlyCollection<string>? Roles,
     bool? Lockout);
 
+/// <summary>
+/// Solicitud para que el propio usuario cambie su contraseña.
+/// </summary>
+/// <param name="CurrentPassword">Contraseña actual para validar la solicitud.</param>
+/// <param name="NewPassword">Nueva contraseña a establecer.</param>
 public record UserChangePasswordDto(
-    [param: Required, StringLength(100, MinimumLength = 1)] string CurrentPassword,
-    [param: Required, StringLength(100, MinimumLength = 6)] string NewPassword);
+    string CurrentPassword,
+    string NewPassword);
 
+/// <summary>
+/// Solicitud para que un administrador restablezca la contraseña de un usuario.
+/// </summary>
+/// <param name="NewPassword">Nueva contraseña a establecer.</param>
 public record UserAdminChangePasswordDto(
-    [param: Required, StringLength(100, MinimumLength = 6)] string NewPassword);
+    string NewPassword);

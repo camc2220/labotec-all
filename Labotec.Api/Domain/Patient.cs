@@ -8,7 +8,6 @@ public class Patient
     public DateTime? BirthDate { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
-    public string? UserId { get; set; }
 
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
     public ICollection<LabResult> Results { get; set; } = new List<LabResult>();
