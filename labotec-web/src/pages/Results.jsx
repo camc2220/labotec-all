@@ -67,6 +67,7 @@ export default function Results() {
   const endpoint = isPatient ? '/api/patients/me/results' : '/api/results'
 
   const loadLabTests = async () => {
+    if (isPatient) return
     setLoadingTests(true)
     try {
       const res = await api.get('/api/labtests', {
@@ -107,13 +108,6 @@ export default function Results() {
     if (!testName) return null
     const normalized = testName.trim().toLowerCase()
     return labTests.find(test => (test.name ?? test.Name ?? '').trim().toLowerCase() === normalized) ?? null
-  }
-
-  const resolveReferenceValue = row => {
-    const directValue = row?.referenceValue ?? row?.ReferenceValue
-    if (directValue) return directValue
-    const matchedTest = findLabTestMatch(row?.testName)
-    return matchedTest?.referenceValue ?? matchedTest?.ReferenceValue ?? ''
   }
 
   const openForm = item => {
@@ -286,7 +280,6 @@ export default function Results() {
         { header: 'Prueba', accessor: row => row.testName ?? '' },
         { header: 'Resultado', accessor: row => row.resultValue ?? '' },
         { header: 'Unidad', accessor: row => row.unit ?? '' },
-        { header: 'Valor de referencia', accessor: row => resolveReferenceValue(row) || '—' },
         { header: 'Registrado por', accessor: row => row.createdByName ?? 'Desconocido' },
         { header: 'Liberado', accessor: row => (row.releasedAt ? formatDateTime(row.releasedAt) : '') },
       ],
@@ -325,11 +318,6 @@ export default function Results() {
     { key: 'testName', header: 'Prueba' },
     { key: 'resultValue', header: 'Resultado' },
     { key: 'unit', header: 'Unidad' },
-    {
-      key: 'referenceValue',
-      header: 'Valor de referencia',
-      render: row => resolveReferenceValue(row) || '—',
-    },
     { key: 'createdByName', header: 'Registrado por' },
     { key: 'releasedAt', header: 'Liberado' },
     ...(!isPatient
@@ -398,7 +386,6 @@ export default function Results() {
           id: resolveEntityId(test) ?? test.code ?? test.Code ?? test.name ?? test.Name,
           name: test.name ?? test.Name ?? 'Sin nombre',
           unit: test.defaultUnit ?? test.DefaultUnit ?? '',
-          referenceValue: test.referenceValue ?? test.ReferenceValue ?? '',
         }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [labTests]
@@ -464,109 +451,102 @@ export default function Results() {
               />
             </div>
             <div className="space-y-4">
-              {formData.results.map((result, index) => {
-                const selectedOption = testOptions.find(option => option.id === result.testId)
-                const referenceValue = selectedOption?.referenceValue || resolveReferenceValue(result)
-                return (
-                  <div key={index} className="rounded-xl border border-slate-200 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Resultado #{index + 1}</p>
-                        <p className="text-xs text-gray-500">Selecciona una prueba existente o escribe su nombre.</p>
-                      </div>
-                      {formData.results.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveResultRow(index)}
-                          className="text-xs text-red-600 hover:underline"
-                        >
-                          Quitar
-                        </button>
+              {formData.results.map((result, index) => (
+                <div key={index} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Resultado #{index + 1}</p>
+                      <p className="text-xs text-gray-500">Selecciona una prueba existente o escribe su nombre.</p>
+                    </div>
+                    {formData.results.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveResultRow(index)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Prueba guardada</label>
+                      <select
+                        value={result.testId}
+                        onChange={e => {
+                          const selected = testOptions.find(option => option.id === e.target.value)
+                          handleResultChange(index, {
+                            testId: e.target.value,
+                            testName: selected?.name ?? '',
+                            unit: selected?.unit ?? '',
+                            unitOption: resolveUnitOption(selected?.unit ?? ''),
+                          })
+                        }}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        disabled={loadingTests}
+                      >
+                        <option value="">Selecciona una prueba</option>
+                        {testOptions.map(option => (
+                          <option key={option.id} value={option.id}>
+                            {option.name}
+                          </option>
+                        ))}
+                      </select>
+                      {loadingTests && <p className="text-xs text-gray-500">Cargando pruebas...</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Nombre de la prueba</label>
+                      <input
+                        value={result.testName}
+                        onChange={e => handleResultChange(index, { testName: e.target.value })}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        disabled={Boolean(result.testId)}
+                        required
+                      />
+                      {result.testId && (
+                        <p className="mt-1 text-xs text-gray-500">Este nombre proviene de la prueba seleccionada.</p>
                       )}
                     </div>
-                    <div className="mt-3 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Prueba guardada</label>
-                        <select
-                          value={result.testId}
-                          onChange={e => {
-                            const selected = testOptions.find(option => option.id === e.target.value)
-                            handleResultChange(index, {
-                              testId: e.target.value,
-                              testName: selected?.name ?? '',
-                              unit: selected?.unit ?? '',
-                              unitOption: resolveUnitOption(selected?.unit ?? ''),
-                            })
-                          }}
-                          className="w-full rounded-lg border px-3 py-2 text-sm"
-                          disabled={loadingTests}
-                        >
-                          <option value="">Selecciona una prueba</option>
-                          {testOptions.map(option => (
-                            <option key={option.id} value={option.id}>
-                              {option.name}
-                            </option>
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Resultado</label>
+                      <input
+                        value={result.resultValue}
+                        onChange={e => handleResultChange(index, { resultValue: e.target.value })}
+                        className="w-full rounded-lg border px-3 py-2 text-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Unidad</label>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                          {UNIT_OPTIONS.map(option => (
+                            <label key={option} className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={result.unitOption === option}
+                                onChange={() => handleUnitOptionChange(index, option)}
+                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                              />
+                              <span>{option === 'other' ? 'Otro' : option}</span>
+                            </label>
                           ))}
-                        </select>
-                        {loadingTests && <p className="text-xs text-gray-500">Cargando pruebas...</p>}
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Nombre de la prueba</label>
-                        <input
-                          value={result.testName}
-                          onChange={e => handleResultChange(index, { testName: e.target.value })}
-                          className="w-full rounded-lg border px-3 py-2 text-sm"
-                          disabled={Boolean(result.testId)}
-                          required
-                        />
-                        {result.testId && (
-                          <p className="mt-1 text-xs text-gray-500">Este nombre proviene de la prueba seleccionada.</p>
+                        </div>
+                        {result.unitOption === 'other' && (
+                          <input
+                            value={result.unit}
+                            onChange={e => handleResultChange(index, { unit: e.target.value, unitOption: 'other' })}
+                            className="w-full rounded-lg border px-3 py-2 text-sm"
+                            placeholder="Escribe la unidad"
+                          />
                         )}
                       </div>
                     </div>
-                    {referenceValue && (
-                      <p className="mt-2 text-xs text-emerald-700">Valor de referencia sugerido: {referenceValue}</p>
-                    )}
-                    <div className="mt-3 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Resultado</label>
-                        <input
-                          value={result.resultValue}
-                          onChange={e => handleResultChange(index, { resultValue: e.target.value })}
-                          className="w-full rounded-lg border px-3 py-2 text-sm"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Unidad</label>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                            {UNIT_OPTIONS.map(option => (
-                              <label key={option} className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
-                                  checked={result.unitOption === option}
-                                  onChange={() => handleUnitOptionChange(index, option)}
-                                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                                />
-                                <span>{option === 'other' ? 'Otro' : option}</span>
-                              </label>
-                            ))}
-                          </div>
-                          {result.unitOption === 'other' && (
-                            <input
-                              value={result.unit}
-                              onChange={e => handleResultChange(index, { unit: e.target.value, unitOption: 'other' })}
-                              className="w-full rounded-lg border px-3 py-2 text-sm"
-                              placeholder="Escribe la unidad"
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                )
-              })}
+                </div>
+              ))}
               <button
                 type="button"
                 onClick={handleAddResultRow}
@@ -610,7 +590,6 @@ export default function Results() {
               <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border p-3">
                 {patientResults.map(row => {
                   const id = getResultKey(row)
-                  const referenceValue = resolveReferenceValue(row)
                   return (
                     <label key={id} className="flex items-start gap-2 text-sm">
                       <input
@@ -625,7 +604,6 @@ export default function Results() {
                           {row.resultValue ?? 'Sin resultado'} {row.unit ?? ''} •{' '}
                           {row.releasedAt ? formatDateTime(row.releasedAt) : 'Sin fecha'}
                           {row.createdByName ? ` • Registrado por ${row.createdByName}` : ''}
-                          {referenceValue ? ` • Ref: ${referenceValue}` : ''}
                         </span>
                       </span>
                     </label>
