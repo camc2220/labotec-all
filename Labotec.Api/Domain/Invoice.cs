@@ -1,3 +1,4 @@
+
 namespace Labotec.Api.Domain;
 
 public class Invoice
@@ -9,4 +10,6 @@ public class Invoice
     public decimal Amount { get; set; }
     public DateTime IssuedAt { get; set; } = DateTime.UtcNow;
     public bool Paid { get; set; } = false;
+
+    public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
 }

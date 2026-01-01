@@ -1,4 +1,5 @@
-﻿using Labotec.Api.Common;
+﻿
+using Labotec.Api.Common;
 using Labotec.Api.Data;
 using Labotec.Api.DTOs;
 using Labotec.Api.Domain;
@@ -29,8 +30,7 @@ public class LabTestsController : ControllerBase
                 t.Id,
                 t.Code,
                 t.Name,
-                t.DefaultUnit,
-                t.ReferenceValue))
+                t.DefaultUnit))
             .ToListAsync();
 
         return Ok(data);
@@ -70,7 +70,6 @@ public class LabTestsController : ControllerBase
                 t.Name,
                 t.DefaultUnit,
                 t.DefaultPrice,
-                t.ReferenceValue,
                 t.Active))
             .ToListAsync();
 
@@ -89,7 +88,6 @@ public class LabTestsController : ControllerBase
             t.Name,
             t.DefaultUnit,
             t.DefaultPrice,
-            t.ReferenceValue,
             t.Active);
     }
 
@@ -105,7 +103,6 @@ public class LabTestsController : ControllerBase
             Name = dto.Name,
             DefaultUnit = dto.DefaultUnit,
             DefaultPrice = dto.DefaultPrice,
-            ReferenceValue = dto.ReferenceValue,
             Active = true
         };
 
@@ -118,7 +115,6 @@ public class LabTestsController : ControllerBase
             entity.Name,
             entity.DefaultUnit,
             entity.DefaultPrice,
-            entity.ReferenceValue,
             entity.Active);
 
         return CreatedAtAction(nameof(GetOne), new { id = entity.Id }, result);
@@ -133,7 +129,6 @@ public class LabTestsController : ControllerBase
         t.Name = dto.Name;
         t.DefaultUnit = dto.DefaultUnit;
         t.DefaultPrice = dto.DefaultPrice;
-        t.ReferenceValue = dto.ReferenceValue;
         t.Active = dto.Active;
 
         await _db.SaveChangesAsync();

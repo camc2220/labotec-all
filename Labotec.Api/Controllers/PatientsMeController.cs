@@ -1,7 +1,10 @@
+﻿
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Labotec.Api.Common;
 using Labotec.Api.Data;
 using Labotec.Api.DTOs;
-using Labotec.Api.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +13,7 @@ namespace Labotec.Api.Controllers;
 
 [ApiController]
 [Route("api/patients/me")]
-[Authorize]
+[Authorize(Roles = "Paciente")]
 public class PatientsMeController : ControllerBase
 {
     private readonly AppDbContext _db;
@@ -19,6 +22,67 @@ public class PatientsMeController : ControllerBase
     {
         _db = db;
     }
+
+    private static bool TryValidateExactHour(DateTime utc, out string error)
+    {
+        if (utc.Minute != 0 || utc.Second != 0 || utc.Millisecond != 0)
+        {
+            error = "Solo se permiten horas exactas (HH:00). No se aceptan minutos.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private async Task<int> GetMaxPatientsPerHourAsync(DateTime bucketStartUtc)
+    {
+        var slot = await _db.AppointmentAvailabilities.AsNoTracking()
+            .Where(x => x.StartUtc == bucketStartUtc)
+            .Select(x => (int?)x.Slots)
+            .FirstOrDefaultAsync();
+
+        if (slot.HasValue) return slot.Value;
+
+
+        var max = await _db.SchedulingSettings.AsNoTracking()
+            .Where(x => x.Id == 1)
+            .Select(x => x.MaxPatientsPerHour)
+            .FirstOrDefaultAsync();
+
+        return max > 0 ? max : 10;
+    }
+
+    private async Task<int> CountBlockingInHourBucket(DateTime scheduledAtBucketUtc, Guid? exceptId = null)
+    {
+        var (startUtc, endUtc) = SchedulingRules.GetLocalHourBucketUtcRange(scheduledAtBucketUtc);
+
+        var q = _db.Appointments.AsNoTracking()
+            .Where(a => a.ScheduledAt >= startUtc && a.ScheduledAt < endUtc)
+            .Where(a => AppointmentStatuses.BlockingForQuery.Contains(a.Status));
+
+        if (exceptId.HasValue) q = q.Where(a => a.Id != exceptId.Value);
+
+        return await q.CountAsync();
+    }
+
+    private async Task<bool> HasHourDuplicate(Guid patientId, DateTime scheduledAtBucketUtc, Guid? exceptId = null)
+    {
+        var (startUtc, endUtc) = SchedulingRules.GetLocalHourBucketUtcRange(scheduledAtBucketUtc);
+
+        var q = _db.Appointments.AsNoTracking()
+            .Where(a => a.PatientId == patientId)
+            .Where(a => a.ScheduledAt >= startUtc && a.ScheduledAt < endUtc)
+            .Where(a => AppointmentStatuses.BlockingForQuery.Contains(a.Status));
+
+        if (exceptId.HasValue) q = q.Where(a => a.Id != exceptId.Value);
+
+        return await q.AnyAsync();
+    }
+
+    // =========================
+    // APPOINTMENTS (ME)
+    // =========================
 
     [HttpGet("appointments")]
     public async Task<ActionResult<PagedResult<AppointmentReadDto>>> GetAppointments(
@@ -37,11 +101,10 @@ public class PatientsMeController : ControllerBase
             .Where(a => a.PatientId == patientId.Value);
 
         if (upcoming)
-        {
             query = query.Where(a => a.ScheduledAt >= DateTime.UtcNow);
-        }
 
         var total = await query.CountAsync();
+
         var data = await query
             .ApplyOrdering(sortBy, sortDir)
             .ApplyPaging(page, pageSize)
@@ -59,21 +122,46 @@ public class PatientsMeController : ControllerBase
     }
 
     [HttpPost("appointments")]
-    public async Task<ActionResult<AppointmentReadDto>> CreateAppointment([FromBody] AppointmentCreateDto dto)
+    public async Task<ActionResult<AppointmentReadDto>> CreateAppointment([FromBody] AppointmentMeCreateDto dto)
     {
         var patientId = User.GetPatientId();
         if (!patientId.HasValue) return Forbid();
 
-        var patient = await _db.Patients.FindAsync(patientId.Value);
-        if (patient is null) return BadRequest("Paciente no existe");
+        if (string.IsNullOrWhiteSpace(dto.Type))
+            return BadRequest("Type es requerido.");
 
-        var entity = new Domain.Appointment
+        var patient = await _db.Patients.FindAsync(patientId.Value);
+        if (patient is null) return BadRequest("Paciente no existe.");
+
+        var rawUtc = SchedulingRules.NormalizeToUtc(dto.ScheduledAt);
+
+        if (!TryValidateExactHour(rawUtc, out var errExactHour))
+            return BadRequest(errExactHour);
+
+        var (bucketStartUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(rawUtc);
+        var scheduledAtUtc = bucketStartUtc;
+
+        if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
+            return BadRequest(errPast);
+
+        if (!SchedulingRules.TryValidateBusinessHours(scheduledAtUtc, out var errHours))
+            return BadRequest(errHours);
+
+        var max = await GetMaxPatientsPerHourAsync(scheduledAtUtc);
+        var count = await CountBlockingInHourBucket(scheduledAtUtc);
+        if (count >= max)
+            return Conflict($"Cupo lleno para esa hora. Máximo {max} pacientes por hora.");
+
+        if (await HasHourDuplicate(patientId.Value, scheduledAtUtc))
+            return Conflict("Ya tienes una cita en esa misma hora.");
+
+        var entity = new Labotec.Api.Domain.Appointment
         {
             PatientId = patientId.Value,
-            ScheduledAt = dto.ScheduledAt,
-            Type = dto.Type,
+            ScheduledAt = scheduledAtUtc,
+            Type = dto.Type.Trim(),
             Notes = dto.Notes,
-            Status = "Scheduled"
+            Status = AppointmentStatuses.Scheduled
         };
 
         _db.Appointments.Add(entity);
@@ -88,29 +176,60 @@ public class PatientsMeController : ControllerBase
             entity.Status,
             entity.Notes);
 
-        return CreatedAtAction(nameof(GetAppointments), new { id = entity.Id }, result);
+        return Ok(result);
     }
 
     [HttpPut("appointments/{id:guid}")]
-    public async Task<IActionResult> UpdateAppointment(Guid id, [FromBody] AppointmentUpdateDto dto)
+    public async Task<IActionResult> UpdateAppointment(Guid id, [FromBody] AppointmentMeUpdateDto dto)
     {
         var patientId = User.GetPatientId();
         if (!patientId.HasValue) return Forbid();
 
+        if (string.IsNullOrWhiteSpace(dto.Type))
+            return BadRequest("Type es requerido.");
+
         var appointment = await _db.Appointments
-            .Where(a => a.Id == id && a.PatientId == patientId.Value)
-            .FirstOrDefaultAsync();
+            .Include(a => a.Patient)
+            .FirstOrDefaultAsync(a => a.Id == id && a.PatientId == patientId.Value);
 
         if (appointment is null) return NotFound();
 
-        appointment.ScheduledAt = dto.ScheduledAt;
-        appointment.Type = dto.Type;
-        appointment.Status = dto.Status;
+        if (!string.Equals(appointment.Status, AppointmentStatuses.Scheduled, StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Solo puedes modificar una cita cuando está en estado Scheduled.");
+
+        var rawUtc = SchedulingRules.NormalizeToUtc(dto.ScheduledAt);
+
+        if (!TryValidateExactHour(rawUtc, out var errExactHour))
+            return BadRequest(errExactHour);
+
+        var (bucketStartUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(rawUtc);
+        var scheduledAtUtc = bucketStartUtc;
+
+        if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
+            return BadRequest(errPast);
+
+        if (!SchedulingRules.TryValidateBusinessHours(scheduledAtUtc, out var errHours))
+            return BadRequest(errHours);
+
+        var max = await GetMaxPatientsPerHourAsync(scheduledAtUtc);
+        var count = await CountBlockingInHourBucket(scheduledAtUtc, exceptId: appointment.Id);
+        if (count >= max)
+            return Conflict($"Cupo lleno para esa hora. Máximo {max} pacientes por hora.");
+
+        if (await HasHourDuplicate(patientId.Value, scheduledAtUtc, exceptId: appointment.Id))
+            return Conflict("Ya tienes otra cita en esa misma hora.");
+
+        appointment.ScheduledAt = scheduledAtUtc;
+        appointment.Type = dto.Type.Trim();
         appointment.Notes = dto.Notes;
 
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    // =========================
+    // RESULTS (ME)
+    // =========================
 
     [HttpGet("results")]
     public async Task<ActionResult<PagedResult<LabResultReadDto>>> GetResults(
@@ -135,6 +254,7 @@ public class PatientsMeController : ControllerBase
         if (!string.IsNullOrWhiteSpace(test)) query = query.Where(r => r.TestName.Contains(test));
 
         var total = await query.CountAsync();
+
         var data = await query
             .ApplyOrdering(sortBy, sortDir)
             .ApplyPaging(page, pageSize)
@@ -145,13 +265,16 @@ public class PatientsMeController : ControllerBase
                 r.TestName,
                 r.ResultValue,
                 r.Unit,
-                r.CreatedByName,
                 r.ReleasedAt,
                 r.PdfUrl))
             .ToListAsync();
 
         return Ok(new PagedResult<LabResultReadDto>(data, page, pageSize, total));
     }
+
+    // =========================
+    // INVOICES (ME)
+    // =========================
 
     [HttpGet("invoices")]
     public async Task<ActionResult<PagedResult<InvoiceReadDto>>> GetInvoices(
@@ -191,7 +314,7 @@ public class PatientsMeController : ControllerBase
                 i.Amount,
                 i.IssuedAt,
                 i.Paid,
-                (i.Items ?? Array.Empty<InvoiceItem>()).AsEnumerable()
+                (i.Items ?? Array.Empty<Labotec.Api.Domain.InvoiceItem>()).AsEnumerable()
                     .Select(item => new InvoiceItemReadDto(
                         item.LabTestId,
                         item.LabTest != null ? item.LabTest.Code : string.Empty,

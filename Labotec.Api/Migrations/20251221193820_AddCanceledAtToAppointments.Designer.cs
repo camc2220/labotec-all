@@ -4,6 +4,7 @@ using Labotec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Labotec.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251221193820_AddCanceledAtToAppointments")]
+    partial class AddCanceledAtToAppointments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -94,76 +97,6 @@ namespace Labotec.Api.Migrations
                     b.ToTable("Appointments", (string)null);
                 });
 
-            modelBuilder.Entity("Labotec.Api.Domain.AppointmentAvailability", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<string>("Day")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("varchar(10)");
-
-                    b.Property<int>("Slots")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<DateTime>("StartUtc")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Time")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("varchar(5)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StartUtc")
-                        .IsUnique();
-
-                    b.ToTable("AppointmentAvailabilities", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_AppointmentAvailabilities_Slots_NonNegative", "Slots >= 0");
-                        });
-                });
-
-            modelBuilder.Entity("Labotec.Api.Domain.AvailabilitySlot", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)");
-
-                    b.Property<int>("Capacity")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
-                    b.Property<DateTime>("StartUtc")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UpdatedByUserId")
-                        .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StartUtc")
-                        .IsUnique();
-
-                    b.ToTable("AvailabilitySlots", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_AvailabilitySlots_Capacity_NonNegative", "Capacity >= 0");
-                        });
-                });
-
             modelBuilder.Entity("Labotec.Api.Domain.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -171,8 +104,7 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(65,30)");
 
                     b.Property<DateTime>("IssuedAt")
                         .HasColumnType("datetime(6)");
@@ -211,7 +143,6 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
@@ -269,8 +200,7 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<decimal?>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(65,30)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -283,10 +213,7 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("LabTestId");
 
-                    b.ToTable("LabOrderItems", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_LabOrderItems_Price_NonNegative", "Price >= 0");
-                        });
+                    b.ToTable("LabOrderItems");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabResult", b =>
@@ -340,8 +267,7 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("varchar(30)");
 
                     b.Property<decimal?>("DefaultPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("decimal(65,30)");
 
                     b.Property<string>("DefaultUnit")
                         .HasMaxLength(40)
@@ -447,30 +373,6 @@ namespace Labotec.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("Patients");
-                });
-
-            modelBuilder.Entity("Labotec.Api.Domain.SchedulingSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("MaxPatientsPerHour")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValue(10);
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("SchedulingSettings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_SchedulingSettings_MaxPatientsPerHour_Positive", "MaxPatientsPerHour > 0");
-                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

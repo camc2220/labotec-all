@@ -1,4 +1,8 @@
-﻿namespace Labotec.Api.DTOs;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace Labotec.Api.DTOs;
 
 public record LabOrderItemReadDto(
     Guid Id,
@@ -9,9 +13,9 @@ public record LabOrderItemReadDto(
     decimal? Price);
 
 public record LabOrderCreateDto(
-    Guid PatientId,
-    IEnumerable<Guid> TestIds,
-    string? Notes);
+    [param: Required] Guid PatientId,
+    [param: Required] IEnumerable<Guid> TestIds,
+    [param: StringLength(500)] string? Notes);
 
 public record LabOrderReadDto(
     Guid Id,
@@ -23,7 +27,7 @@ public record LabOrderReadDto(
     IReadOnlyCollection<LabOrderItemReadDto> Items);
 
 public record LabOrderStatusUpdateDto(
-    string Status);
+    [param: Required, StringLength(30, MinimumLength = 2)] string Status);
 
 public record LabOrderItemStatusUpdateDto(
-    string Status);
+    [param: Required, StringLength(30, MinimumLength = 2)] string Status);

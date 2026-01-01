@@ -1,3 +1,5 @@
+
+
 {
   "profiles": {
     "Labotec.Api": {
@@ -5,7 +7,7 @@
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "launchUrl": "swagger",
-      "applicationUrl": "https://localhost:7182;http://localhost:5182",
+      "applicationUrl": "http://localhost:8080",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
