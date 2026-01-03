@@ -12,6 +12,7 @@ const typeOptions = [
   'Perfil tiroideo',
   'Panel prenatal',
   'Chequeo ejecutivo',
+  
 ]
 
 const statusOptions = ['Urgente', 'Rutinario', 'Normal']
