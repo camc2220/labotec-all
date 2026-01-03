@@ -9,6 +9,8 @@ import {
   ACTIVE_QUEUE_STATUSES,
   APPOINTMENT_STATUSES,
   STATUS_FLOW,
+  canTransition,
+  getAllowedTransitions,
   getNextStatus,
   normalizeStatus,
   toAllowedStatus,
@@ -463,7 +465,7 @@ export default function Appointments() {
     const fromData = items
       .map((x) => normalizeStatus(x.status) || x.status)
       .filter(Boolean)
-    const set = new Set([...fromData, ...baseStatusOptions])
+    const set = new Set([...baseStatusOptions, ...fromData])
     return Array.from(set).filter((s) => APPOINTMENT_STATUSES.includes(normalizeStatus(s) || s))
   }, [items])
 
@@ -471,9 +473,14 @@ export default function Appointments() {
     ? [formData.type, ...typeOptions]
     : typeOptions
 
-  const availableStatusOptions = formData.status && !statusOptions.includes(formData.status)
-    ? [formData.status, ...statusOptions]
-    : statusOptions
+  const formStatusOptions = useMemo(() => {
+    if (!editingItem) return []
+    const allowed = getAllowedTransitions(editingItem.status || formData.status)
+    if (allowed.length) return allowed
+
+    const fallback = new Set([formData.status || '', ...statusOptions])
+    return Array.from(fallback).filter(Boolean)
+  }, [editingItem, formData.status, statusOptions])
 
   const fetchData = useCallback(async () => {
     if (!user) return
@@ -685,6 +692,13 @@ export default function Appointments() {
             setFormError('Selecciona un estado.')
             return
           }
+
+          const previousStatus = normalizeStatus(editingItem?.status) || editingItem?.status || st
+          if (!canTransition(previousStatus, st)) {
+            setFormError('Transición de estado no permitida para este estado.')
+            return
+          }
+
           payload.status = st
         }
         await api.put(resourceUrl, payload)
@@ -728,6 +742,12 @@ export default function Appointments() {
     const statusToSend = toAllowedStatus(newStatus)
     if (!statusToSend) {
       setStatusError('Selecciona un estado válido.')
+      return
+    }
+
+    const currentStatus = normalizeStatus(row.status) || row.status || ''
+    if (!canTransition(currentStatus, statusToSend)) {
+      setStatusError('Transición no permitida para este estado.')
       return
     }
 
@@ -826,6 +846,9 @@ export default function Appointments() {
           const statusValue = normalizeStatus(row.status) || row.status || ''
           if (!canManageAppointments || isPatient) return statusValue || '-'
 
+          const rowStatusOptions = getAllowedTransitions(statusValue)
+          const selectOptions = rowStatusOptions.length ? rowStatusOptions : statusOptions
+
           return (
             <select
               value={statusValue}
@@ -835,7 +858,7 @@ export default function Appointments() {
               title="Cambiar estado"
             >
               <option value="">-</option>
-              {statusOptions.map((opt) => (
+              {selectOptions.map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
@@ -1257,7 +1280,7 @@ export default function Appointments() {
                     required
                   >
                     <option value="">Selecciona una opción</option>
-                    {availableStatusOptions.map((option) => (
+                    {formStatusOptions.map((option) => (
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
