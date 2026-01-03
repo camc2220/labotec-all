@@ -172,8 +172,15 @@ function getHoursForDate(dateStr) {
 }
 
 function buildScheduledAt(dateStr, hour) {
-  // Enviar como string sin timezone: "YYYY-MM-DDTHH:00:00"
   if (!dateStr || hour == null) return ''
+
+  // Convertimos explícitamente a UTC para evitar desfasajes de zona horaria.
+  const localDate = buildLocalDateFromDayHour(dateStr, hour)
+  if (localDate instanceof Date && !Number.isNaN(localDate.getTime())) {
+    return localDate.toISOString() // ej: 2024-10-10T13:00:00.000Z (09:00 RD)
+  }
+
+  // Fallback: formato local sin zona horaria
   return `${dateStr}T${pad2(hour)}:00:00`
 }
 
@@ -585,11 +592,9 @@ export default function Appointments() {
   }
 
   const matchesDayAndHour = (scheduledAt, day, hourStr) => {
-    const d = new Date(scheduledAt)
-    if (Number.isNaN(d.getTime())) return false
-    const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-    const itHour = `${pad2(d.getHours())}:00`
-    return itDay === day && itHour === hourStr
+    const { day: slotDay, hour } = extractLocalDayHour(scheduledAt)
+    if (!slotDay || hour == null) return false
+    return slotDay === day && `${pad2(hour)}:00` === hourStr
   }
 
   const getBookedCount = (day, hourStr, excludeId) =>
@@ -702,6 +707,7 @@ export default function Appointments() {
 
       closeForm()
       fetchData()
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setFormError(getApiMessage(err, 'No pudimos guardar la cita. Revisa los datos e intenta nuevamente.'))
@@ -719,6 +725,7 @@ export default function Appointments() {
     try {
       await api.delete(`/api/appointments/${id}`)
       fetchData()
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setError(getApiMessage(err, 'No pudimos eliminar la cita.'))
@@ -754,6 +761,7 @@ export default function Appointments() {
       await api.put(`/api/appointments/${row.id}`, payload)
 
       setItems((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: payload.status } : x)))
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setStatusError(getApiMessage(err, 'No pudimos cambiar el estado.'))
