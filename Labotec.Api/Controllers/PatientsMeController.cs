@@ -142,10 +142,16 @@ public class PatientsMeController : ControllerBase
             return BadRequest(errExactHour);
 
         var (bucketStartUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(rawUtc);
+        var (currentBucketUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(appointment.ScheduledAt);
         var scheduledAtUtc = bucketStartUtc;
 
-        if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
-            return BadRequest(errPast);
+        var scheduledChanged = currentBucketUtc != bucketStartUtc;
+
+        if (scheduledChanged)
+        {
+            if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
+                return BadRequest(errPast);
+        }
 
         if (!SchedulingRules.TryValidateBusinessHours(scheduledAtUtc, out var errHours))
             return BadRequest(errHours);

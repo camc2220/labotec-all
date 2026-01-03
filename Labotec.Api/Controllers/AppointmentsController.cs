@@ -698,9 +698,10 @@ public class AppointmentsController : ControllerBase
             return BadRequest(errExactHour);
 
         var (bucketStartUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(rawUtc);
+        var (currentBucketUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(a.ScheduledAt);
         var scheduledAtUtc = bucketStartUtc;
 
-        var scheduledChanged = a.ScheduledAt != scheduledAtUtc;
+        var scheduledChanged = currentBucketUtc != bucketStartUtc;
 
         if (scheduledChanged)
         {
