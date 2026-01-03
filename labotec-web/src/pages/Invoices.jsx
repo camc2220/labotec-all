@@ -50,6 +50,8 @@ export default function Invoices() {
   const [printPatientKey, setPrintPatientKey] = useState('')
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
   const [updatingPaidId, setUpdatingPaidId] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [resultLimit, setResultLimit] = useState('10')
 
   const isPatient = user?.role === 'patient'
   const canManage = user?.isAdmin || user?.isFacturacion
@@ -232,6 +234,38 @@ export default function Invoices() {
     return items.filter(row => getPatientKey(row) === printPatientKey && selectedSet.has(getInvoiceKey(row)))
   }, [items, printPatientKey, selectedInvoiceIds])
 
+  const filteredItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (!term) return items
+
+    return items.filter(row => {
+      const amount = row.amount ?? row.Amount
+      const issuedAt = row.issuedAt ? formatDate(row.issuedAt) : ''
+      const tests = (row.items ?? row.Items ?? [])
+        .map(item => item.name ?? item.Name ?? item.code ?? item.Code ?? '')
+        .filter(Boolean)
+        .join(' ')
+
+      const values = [
+        row.number,
+        row.patientName,
+        row.patientId ? `paciente ${row.patientId}` : '',
+        issuedAt,
+        tests,
+        typeof amount === 'number' ? amount.toString() : amount,
+      ]
+
+      return values.some(value => value && value.toString().toLowerCase().includes(term))
+    })
+  }, [items, searchTerm])
+
+  const visibleItems = useMemo(() => {
+    if (resultLimit === 'all') return filteredItems
+    const limitNumber = Number(resultLimit)
+    if (Number.isNaN(limitNumber) || limitNumber <= 0) return filteredItems
+    return filteredItems.slice(0, limitNumber)
+  }, [filteredItems, resultLimit])
+
   const selectedLabTestIds = useMemo(
     () => new Set((formData.items ?? []).map(item => item.labTestId)),
     [formData.items]
@@ -387,6 +421,10 @@ export default function Invoices() {
     closePrintModal()
   }
 
+  const handleRowPrint = row => {
+    printRows([row])
+  }
+
   const toggleLabTestSelection = labTestId => {
     setFormData(prev => {
       const items = prev.items ?? []
@@ -445,6 +483,7 @@ export default function Invoices() {
           header: 'Acciones',
           render: row => (
             <div className="flex flex-wrap gap-2">
+              <button onClick={() => handleRowPrint(row)} className="text-xs text-indigo-700 hover:underline">Imprimir</button>
               <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">Editar</button>
               <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">Eliminar</button>
             </div>
@@ -484,14 +523,48 @@ export default function Invoices() {
           </div>
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <label className="text-sm text-gray-700" htmlFor="invoice-search">Buscar</label>
+          <input
+            id="invoice-search"
+            type="search"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Número, paciente o prueba"
+            className="w-full max-w-sm rounded-lg border px-3 py-2 text-sm"
+          />
+          <label className="text-sm text-gray-700" htmlFor="invoice-limit">Mostrar</label>
+          <select
+            id="invoice-limit"
+            value={resultLimit}
+            onChange={e => setResultLimit(e.target.value)}
+            className="rounded-lg border px-3 py-2 text-sm"
+          >
+            <option value="10">Últimas 10</option>
+            <option value="20">Últimas 20</option>
+            <option value="50">Últimas 50</option>
+            <option value="all">Todas</option>
+          </select>
+        </div>
+
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : items.length > 0 ? (
-            <Table columns={columns} data={items} />
+          ) : visibleItems.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <span>Mostrando {visibleItems.length} de {filteredItems.length} resultados</span>
+                {resultLimit !== 'all' && filteredItems.length > visibleItems.length && <span>Usa "Todas" para ver todos los resultados</span>}
+              </div>
+              <Table columns={columns} data={visibleItems} />
+            </>
           ) : (
-            <div className="text-sm text-gray-500">{isPatient ? 'No tienes facturas registradas.' : 'No hay facturas registradas.'}</div>
+            <div className="text-sm text-gray-500">
+              {isPatient
+                ? 'No tienes facturas registradas o coincidentes con la búsqueda.'
+                : 'No hay facturas registradas o coincidentes con la búsqueda.'}
+            </div>
           )}
         </div>
       </div>
