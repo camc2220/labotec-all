@@ -5,7 +5,14 @@ import Modal from '../components/Modal'
 import { resolveEntityId } from '../lib/entity'
 import { useAuth } from '../context/AuthContext'
 import PatientSelect from '../components/PatientSelect'
-import { ACTIVE_QUEUE_STATUSES, STATUS_FLOW, getNextStatus, normalizeStatus } from '../lib/appointmentStatus'
+import {
+  ACTIVE_QUEUE_STATUSES,
+  APPOINTMENT_STATUSES,
+  STATUS_FLOW,
+  getNextStatus,
+  normalizeStatus,
+  toAllowedStatus,
+} from '../lib/appointmentStatus'
 
 const baseTypeOptions = [
   'Perfil completo de laboratorio',
@@ -22,15 +29,6 @@ const baseStatusOptions = [
   'Completed',
   'NoShow',
   'Canceled',
-  'Cancelled',
-  'Confirmed',
-  'Pendiente',
-  'Confirmada',
-  'Atendida',
-  'Cancelada',
-  'Urgente',
-  'Rutinario',
-  'Normal',
 ]
 
 // ✅ Horas permitidas (sin 12:00 Lun–Vie)
@@ -466,7 +464,7 @@ export default function Appointments() {
       .map((x) => normalizeStatus(x.status) || x.status)
       .filter(Boolean)
     const set = new Set([...fromData, ...baseStatusOptions])
-    return Array.from(set)
+    return Array.from(set).filter((s) => APPOINTMENT_STATUSES.includes(normalizeStatus(s) || s))
   }, [items])
 
   const availableTypeOptions = formData.type && !typeOptions.includes(formData.type)
@@ -727,7 +725,7 @@ export default function Appointments() {
     if (!canManageAppointments || isPatient) return
     if (!row?.id) return
 
-    const statusToSend = normalizeStatus(newStatus) || String(newStatus || '').trim()
+    const statusToSend = toAllowedStatus(newStatus)
     if (!statusToSend) {
       setStatusError('Selecciona un estado válido.')
       return

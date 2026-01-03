@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import { ACTIVE_QUEUE_STATUSES, normalizeStatus } from '../lib/appointmentStatus'
+import { ACTIVE_QUEUE_STATUSES, normalizeStatus, toAllowedStatus } from '../lib/appointmentStatus'
 
 const REFRESH_INTERVAL_MS = 30000
 
@@ -64,7 +64,7 @@ export default function NextTurnDisplay() {
           .map((item) => ({
             ...item,
             parsedDate: parseDate(item.scheduledAt),
-            normalizedStatus: normalizeStatus(item.status) || 'Scheduled',
+            normalizedStatus: toAllowedStatus(item.status) || 'Scheduled',
           }))
           .filter((item) => item.parsedDate && ACTIVE_QUEUE_STATUSES.has(item.normalizedStatus))
           .sort((a, b) => a.parsedDate - b.parsedDate)
