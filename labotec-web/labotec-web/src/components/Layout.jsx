@@ -14,6 +14,8 @@ function getRoleLabel(user) {
 export default function Layout() {
   const { user, logout } = useAuth()
 
+  const canProjectTurn = user?.isAdmin || user?.isRecepcion || user?.isFacturacion || user?.isBioanalista
+
   const navigation = useMemo(() => {
     if (!user) return []
 
@@ -101,6 +103,15 @@ export default function Layout() {
             ))}
           </nav>
           <div className="flex items-center gap-3 text-right">
+            {canProjectTurn && (
+              <button
+                type="button"
+                onClick={() => window.open('/app/next-turn-display', '_blank', 'noopener,noreferrer')}
+                className="inline-flex rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20"
+              >
+                Proyectar turno
+              </button>
+            )}
             <div className="leading-tight text-xs text-white/80">
               <p className="text-sm font-semibold text-white">{user.name}</p>
               <p className="capitalize">{roleLabel}</p>
