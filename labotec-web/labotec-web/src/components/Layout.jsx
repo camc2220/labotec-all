@@ -4,22 +4,27 @@ import { useAuth } from '../context/AuthContext'
 
 function getRoleLabel(user) {
   if (!user) return ''
-  if (user.isAdmin) return 'Administrador'
-  if (user.isRecepcion) return 'Recepción'
-  if (user.isFacturacion) return 'Facturación'
-  if (user.isBioanalista) return 'Bioanalista'
+  if (user.isAdmin || user.role === 'admin') return 'Administrador'
+  if (user.isRecepcion || user.role === 'recepcion') return 'Recepción'
+  if (user.isFacturacion || user.role === 'facturacion') return 'Facturación'
+  if (user.isBioanalista || user.role === 'bioanalista') return 'Bioanalista'
   return 'Paciente'
 }
 
 export default function Layout() {
   const { user, logout } = useAuth()
 
-  const canProjectTurn = user?.isAdmin || user?.isRecepcion || user?.isFacturacion || user?.isBioanalista
+  const isAdmin = user?.isAdmin || user?.role === 'admin'
+  const isRecepcion = user?.isRecepcion || user?.role === 'recepcion'
+  const isFacturacion = user?.isFacturacion || user?.role === 'facturacion'
+  const isBioanalista = user?.isBioanalista || user?.role === 'bioanalista'
+
+  const canProjectTurn = isAdmin || isRecepcion || isFacturacion || isBioanalista
 
   const navigation = useMemo(() => {
     if (!user) return []
 
-    if (user.isAdmin) {
+    if (isAdmin) {
       return [
         { to: '/app/users', label: 'Usuarios' },
         { to: '/app/patients', label: 'Pacientes' },
@@ -32,7 +37,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isRecepcion) {
+    if (isRecepcion) {
       return [
         { to: '/app/appointments', label: 'Citas' },
         { to: '/app/next-turn-display', label: 'Próximo turno' },
@@ -41,7 +46,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isFacturacion) {
+    if (isFacturacion) {
       return [
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
@@ -50,7 +55,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isBioanalista) {
+    if (isBioanalista) {
       return [
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
