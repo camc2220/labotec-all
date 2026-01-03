@@ -29,6 +29,19 @@ public static class AppointmentAvailabilityHelper
         return (local.ToString("yyyy-MM-dd"), local.ToString("HH:00"));
     }
 
+    /// <summary>
+    /// Normaliza la llave de bucket a UTC y con minutos/segundos en cero para
+    /// evitar discrepancias por DateTimeKind.Unspecified al leer desde la BD.
+    /// </summary>
+    public static DateTime NormalizeBucketKey(DateTime bucketStartUtc)
+    {
+        var utc = bucketStartUtc.Kind == DateTimeKind.Utc
+            ? bucketStartUtc
+            : DateTime.SpecifyKind(bucketStartUtc, DateTimeKind.Utc);
+
+        return new DateTime(utc.Year, utc.Month, utc.Day, utc.Hour, 0, 0, DateTimeKind.Utc);
+    }
+
     public static IEnumerable<DateTime> BuildWorkingHourBuckets(DateTime startLocalDate, int days)
     {
         if (days <= 0) yield break;

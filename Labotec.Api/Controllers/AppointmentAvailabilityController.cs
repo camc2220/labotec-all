@@ -75,21 +75,31 @@ public class AppointmentAvailabilityController : ControllerBase
         var bucketSet = new HashSet<DateTime>(AppointmentAvailabilityHelper.BuildWorkingHourBuckets(todayLocal, rangeDays));
 
         foreach (var slot in customSlots)
-            bucketSet.Add(slot.StartUtc);
+            bucketSet.Add(AppointmentAvailabilityHelper.NormalizeBucketKey(slot.StartUtc));
 
-        if (bucketSet.Count == 0)
+        var buckets = bucketSet
+            .Select(AppointmentAvailabilityHelper.NormalizeBucketKey)
+            .Where(b => SchedulingRules.TryValidateBusinessHours(b, out _))
+            .OrderBy(x => x)
+            .ToList();
+
+        if (buckets.Count == 0)
             return Ok(Array.Empty<AppointmentAvailabilityDto>());
 
-        var buckets = bucketSet.OrderBy(x => x).ToList();
-        var customMap = customSlots.ToDictionary(x => x.StartUtc, x => x);
+        var bucketKeys = new HashSet<DateTime>(buckets);
+        var customMap = customSlots
+            .Select(slot => (Key: AppointmentAvailabilityHelper.NormalizeBucketKey(slot.StartUtc), Slot: slot))
+            .Where(x => bucketKeys.Contains(x.Key))
+            .ToDictionary(x => x.Key, x => x.Slot);
 
         var bookedByBucket = await AppointmentAvailabilityHelper.CountBookedByBucketAsync(
             _db,
             buckets.First(),
             buckets.Last().AddHours(1));
 
-        var list = buckets.Select(startUtc =>
+        var list = buckets.Select(raw =>
         {
+            var startUtc = AppointmentAvailabilityHelper.NormalizeBucketKey(raw);
             var capacity = customMap.TryGetValue(startUtc, out var slot) ? slot.Slots : defaultCapacity;
             var booked = bookedByBucket.TryGetValue(startUtc, out var count) ? count : 0;
             var (day, time) = AppointmentAvailabilityHelper.ToLocalStrings(startUtc);
