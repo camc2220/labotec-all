@@ -20,6 +20,7 @@ public class ResultsController : ControllerBase
     public ResultsController(AppDbContext db) => _db = db;
 
     private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private string GetActorName() => User?.Identity?.Name ?? "Desconocido";
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<LabResultReadDto>>> Get(
@@ -54,7 +55,16 @@ public class ResultsController : ControllerBase
         var data = await q
             .ApplyOrdering(sortBy, sortDir)
             .ApplyPaging(page, pageSize)
-            .Select(r => new LabResultReadDto(r.Id, r.PatientId, r.Patient.FullName, r.TestName, r.ResultValue, r.Unit, r.ReleasedAt, r.PdfUrl))
+            .Select(r => new LabResultReadDto(
+                r.Id,
+                r.PatientId,
+                r.Patient.FullName,
+                r.TestName,
+                r.ResultValue,
+                r.Unit,
+                r.CreatedByName,
+                r.ReleasedAt,
+                r.PdfUrl))
             .ToListAsync();
 
         return Ok(new PagedResult<LabResultReadDto>(data, page, pageSize, total));
@@ -97,6 +107,7 @@ public class ResultsController : ControllerBase
                 r.TestName,
                 r.ResultValue,
                 r.Unit,
+                r.CreatedByName,
                 r.ReleasedAt,
                 r.PdfUrl
             })
@@ -104,7 +115,7 @@ public class ResultsController : ControllerBase
 
         var rows = new List<IEnumerable<string?>>
         {
-            new[] { "ID", "Paciente", "Prueba", "Resultado", "Unidad", "Fecha", "PDF" }
+            new[] { "ID", "Paciente", "Prueba", "Resultado", "Unidad", "Registrado por", "Fecha", "PDF" }
         };
 
         foreach (var item in data)
@@ -116,6 +127,7 @@ public class ResultsController : ControllerBase
                 item.TestName,
                 item.ResultValue,
                 item.Unit,
+                item.CreatedByName,
                 item.ReleasedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
                 item.PdfUrl
             });
@@ -140,6 +152,7 @@ public class ResultsController : ControllerBase
             TestName = dto.TestName,
             ResultValue = dto.ResultValue,
             Unit = dto.Unit,
+            CreatedByName = GetActorName(),
             ReleasedAt = dto.ReleasedAt ?? DateTime.UtcNow,
             PdfUrl = dto.PdfUrl
         };
@@ -147,7 +160,16 @@ public class ResultsController : ControllerBase
         _db.LabResults.Add(entity);
         await _db.SaveChangesAsync();
 
-        var result = new LabResultReadDto(entity.Id, patient.Id, patient.FullName, entity.TestName, entity.ResultValue, entity.Unit, entity.ReleasedAt, entity.PdfUrl);
+        var result = new LabResultReadDto(
+            entity.Id,
+            patient.Id,
+            patient.FullName,
+            entity.TestName,
+            entity.ResultValue,
+            entity.Unit,
+            entity.CreatedByName,
+            entity.ReleasedAt,
+            entity.PdfUrl);
         return CreatedAtAction(nameof(Create), new { id = entity.Id }, result);
     }
 
@@ -163,6 +185,7 @@ public class ResultsController : ControllerBase
         r.Unit = dto.Unit;
         r.ReleasedAt = dto.ReleasedAt;
         r.PdfUrl = dto.PdfUrl;
+        r.CreatedByName = GetActorName();
 
         await _db.SaveChangesAsync();
         return NoContent();

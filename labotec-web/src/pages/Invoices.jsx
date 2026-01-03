@@ -50,6 +50,10 @@ export default function Invoices() {
   const [printPatientKey, setPrintPatientKey] = useState('')
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
   const [updatingPaidId, setUpdatingPaidId] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [resultLimit, setResultLimit] = useState('10')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const isPatient = user?.role === 'patient'
   const canManage = user?.isAdmin || user?.isFacturacion
@@ -61,8 +65,16 @@ export default function Invoices() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get(endpoint, { params: { page: 1, pageSize: 20, sortDir: 'desc' } })
-      setItems(res.data.items ?? res.data.Items ?? [])
+      const res = await api.get(endpoint, { params: { page: 1, pageSize: 200, sortDir: 'desc' } })
+      const list = res.data.items ?? res.data.Items ?? []
+      const sorted = [...list].sort((a, b) => {
+        const aDate = a.issuedAt ? new Date(a.issuedAt) : null
+        const bDate = b.issuedAt ? new Date(b.issuedAt) : null
+        const aTime = aDate && !Number.isNaN(aDate.getTime()) ? aDate.getTime() : 0
+        const bTime = bDate && !Number.isNaN(bDate.getTime()) ? bDate.getTime() : 0
+        return bTime - aTime
+      })
+      setItems(sorted)
     } catch (err) {
       console.error(err)
       setError('No pudimos cargar las facturas. Intenta nuevamente más tarde.')
@@ -232,6 +244,58 @@ export default function Invoices() {
     return items.filter(row => getPatientKey(row) === printPatientKey && selectedSet.has(getInvoiceKey(row)))
   }, [items, printPatientKey, selectedInvoiceIds])
 
+  const invalidDateRange = useMemo(() => {
+    if (!startDate || !endDate) return false
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    return start > end
+  }, [startDate, endDate])
+
+  const filteredItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    const startValue = startDate ? new Date(`${startDate}T00:00:00`) : null
+    const endValue = endDate ? new Date(`${endDate}T23:59:59`) : null
+
+    return items.filter(row => {
+      const issuedDate = row.issuedAt ? new Date(row.issuedAt) : null
+      const issuedValid = issuedDate && !Number.isNaN(issuedDate.getTime())
+
+      if (invalidDateRange) return false
+      if (startValue || endValue) {
+        if (!issuedValid) return false
+        if (startValue && issuedDate < startValue) return false
+        if (endValue && issuedDate > endValue) return false
+      }
+
+      if (!term) return true
+
+      const amount = row.amount ?? row.Amount
+      const issuedAt = row.issuedAt ? formatDate(row.issuedAt) : ''
+      const tests = (row.items ?? row.Items ?? [])
+        .map(item => item.name ?? item.Name ?? item.code ?? item.Code ?? '')
+        .filter(Boolean)
+        .join(' ')
+
+      const values = [
+        row.number,
+        row.patientName,
+        row.patientId ? `paciente ${row.patientId}` : '',
+        issuedAt,
+        tests,
+        typeof amount === 'number' ? amount.toString() : amount,
+      ]
+
+      return values.some(value => value && value.toString().toLowerCase().includes(term))
+    })
+  }, [items, searchTerm, startDate, endDate, invalidDateRange])
+
+  const visibleItems = useMemo(() => {
+    if (resultLimit === 'all') return filteredItems
+    const limitNumber = Number(resultLimit)
+    if (Number.isNaN(limitNumber) || limitNumber <= 0) return filteredItems
+    return filteredItems.slice(0, limitNumber)
+  }, [filteredItems, resultLimit])
+
   const selectedLabTestIds = useMemo(
     () => new Set((formData.items ?? []).map(item => item.labTestId)),
     [formData.items]
@@ -387,6 +451,10 @@ export default function Invoices() {
     closePrintModal()
   }
 
+  const handleRowPrint = row => {
+    printRows([row])
+  }
+
   const toggleLabTestSelection = labTestId => {
     setFormData(prev => {
       const items = prev.items ?? []
@@ -445,6 +513,7 @@ export default function Invoices() {
           header: 'Acciones',
           render: row => (
             <div className="flex flex-wrap gap-2">
+              <button onClick={() => handleRowPrint(row)} className="text-xs text-indigo-700 hover:underline">Imprimir</button>
               <button onClick={() => openForm(row)} className="text-xs text-sky-700 hover:underline">Editar</button>
               <button onClick={() => handleDelete(row)} className="text-xs text-red-600 hover:underline">Eliminar</button>
             </div>
@@ -484,14 +553,100 @@ export default function Invoices() {
           </div>
         </div>
 
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="invoice-search">Buscar</label>
+            <input
+              id="invoice-search"
+              type="search"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Número, paciente o prueba"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="invoice-limit">Mostrar</label>
+            <select
+              id="invoice-limit"
+              value={resultLimit}
+              onChange={e => setResultLimit(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="10">Últimas 10</option>
+              <option value="20">Últimas 20</option>
+              <option value="50">Últimas 50</option>
+              <option value="all">Todas</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="invoice-start-date">Desde</label>
+            <input
+              id="invoice-start-date"
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="invoice-end-date">Hasta</label>
+            <input
+              id="invoice-end-date"
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-600">
+          {(searchTerm || startDate || endDate) && !invalidDateRange && (
+            <span>
+              Filtros activos:
+              {searchTerm && <> búsqueda "{searchTerm}"</>}
+              {startDate && <> desde {startDate}</>}
+              {endDate && <> hasta {endDate}</>}
+            </span>
+          )}
+          {(searchTerm || startDate || endDate) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('')
+                setStartDate('')
+                setEndDate('')
+              }}
+              className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {invalidDateRange && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              El rango de fechas es inválido. La fecha inicial debe ser anterior o igual a la final.
+            </div>
+          )}
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : items.length > 0 ? (
-            <Table columns={columns} data={items} />
+          ) : visibleItems.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <span>Mostrando {visibleItems.length} de {filteredItems.length} resultados</span>
+                {resultLimit !== 'all' && filteredItems.length > visibleItems.length && <span>Usa "Todas" para ver todos los resultados</span>}
+              </div>
+              <Table columns={columns} data={visibleItems} />
+            </>
           ) : (
-            <div className="text-sm text-gray-500">{isPatient ? 'No tienes facturas registradas.' : 'No hay facturas registradas.'}</div>
+            <div className="text-sm text-gray-500">
+              {isPatient
+                ? 'No tienes facturas registradas o coincidentes con la búsqueda.'
+                : 'No hay facturas registradas o coincidentes con la búsqueda.'}
+            </div>
           )}
         </div>
       </div>

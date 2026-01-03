@@ -160,6 +160,9 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(t => t.DefaultPrice)
                 .HasPrecision(18, 2);
 
+            entity.Property(t => t.ReferenceValue)
+                .HasMaxLength(160);
+
             entity.HasIndex(t => t.Code).IsUnique();
         });
 
@@ -190,6 +193,10 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
 
             entity.Property(r => r.Unit)
                 .IsRequired();
+
+            entity.Property(r => r.CreatedByName)
+                .IsRequired()
+                .HasMaxLength(160);
 
             entity.Property(r => r.PdfUrl)
                 .HasMaxLength(300);

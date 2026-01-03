@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext'
 
 function getRoleLabel(user) {
   if (!user) return ''
-  if (user.isAdmin) return 'Administrador'
-  if (user.isRecepcion) return 'Recepción'
-  if (user.isFacturacion) return 'Facturación'
-  if (user.isBioanalista) return 'Bioanalista'
+  if (user.isAdmin || user.role === 'admin') return 'Administrador'
+  if (user.isRecepcion || user.role === 'recepcion') return 'Recepción'
+  if (user.isFacturacion || user.role === 'facturacion') return 'Facturación'
+  if (user.isBioanalista || user.role === 'bioanalista') return 'Bioanalista'
   return 'Paciente'
 }
 
@@ -17,7 +17,7 @@ export default function Layout() {
   const navigation = useMemo(() => {
     if (!user) return []
 
-    if (user.isAdmin) {
+    if (user.isAdmin || user.role === 'admin') {
       return [
         { to: '/app/users', label: 'Usuarios' },
         { to: '/app/patients', label: 'Pacientes' },
@@ -29,7 +29,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isRecepcion) {
+    if (user.isRecepcion || user.role === 'recepcion') {
       return [
         { to: '/app/appointments', label: 'Citas' },
         { to: '/app/patients', label: 'Pacientes' },
@@ -37,7 +37,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isFacturacion) {
+    if (user.isFacturacion || user.role === 'facturacion') {
       return [
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
@@ -45,7 +45,7 @@ export default function Layout() {
       ]
     }
 
-    if (user.isBioanalista) {
+    if (user.isBioanalista || user.role === 'bioanalista') {
       return [
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },

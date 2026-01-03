@@ -5,6 +5,14 @@ import Modal from '../components/Modal'
 import { resolveEntityId } from '../lib/entity'
 import { useAuth } from '../context/AuthContext'
 import PatientSelect from '../components/PatientSelect'
+import {
+  ACTIVE_QUEUE_STATUSES,
+  APPOINTMENT_STATUSES,
+  STATUS_FLOW,
+  getNextStatus,
+  normalizeStatus,
+  toAllowedStatus,
+} from '../lib/appointmentStatus'
 
 const baseTypeOptions = [
   'Perfil completo de laboratorio',
@@ -21,61 +29,111 @@ const baseStatusOptions = [
   'Completed',
   'NoShow',
   'Canceled',
-  'Cancelled',
-  'Confirmed',
-  'Pendiente',
-  'Confirmada',
-  'Atendida',
-  'Cancelada',
-  'Urgente',
-  'Rutinario',
-  'Normal',
 ]
-
-const statusAlias = {
-  scheduled: 'Scheduled',
-  pendiente: 'Scheduled',
-  confirmed: 'Scheduled',
-  confirmada: 'Scheduled',
-  checkin: 'CheckedIn',
-  'check-in': 'CheckedIn',
-  checkedin: 'CheckedIn',
-  enprogreso: 'InProgress',
-  inprogress: 'InProgress',
-  atendiendo: 'InProgress',
-  atendida: 'Completed',
-  completed: 'Completed',
-  completada: 'Completed',
-  cancelada: 'Canceled',
-  cancelled: 'Canceled',
-  canceled: 'Canceled',
-  noshow: 'NoShow',
-  'no_show': 'NoShow',
-}
-
-const STATUS_FLOW = ['Scheduled', 'CheckedIn', 'InProgress', 'Completed']
-const ACTIVE_QUEUE_STATUSES = new Set(['Scheduled', 'CheckedIn', 'InProgress'])
-
-const normalizeStatus = (value) => {
-  if (!value) return ''
-  const key = String(value).replace(/\s+/g, '').toLowerCase()
-  return statusAlias[key] ?? value
-}
-
-const getNextStatus = (value) => {
-  const current = normalizeStatus(value) || 'Scheduled'
-  const idx = STATUS_FLOW.indexOf(current)
-  if (idx === -1) return STATUS_FLOW[0]
-  if (idx >= STATUS_FLOW.length - 1) return STATUS_FLOW[idx]
-  return STATUS_FLOW[idx + 1]
-}
 
 // ✅ Horas permitidas (sin 12:00 Lun–Vie)
 const WEEKDAY_HOURS = [8, 9, 10, 11, 13, 14, 15, 16] // 08–17, bloquea 12, último turno 16:00
 const SAT_HOURS = [8, 9, 10, 11] // 08–12, último turno 11:00
+const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
+
+function parseDateValue(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  const str = String(value ?? '').trim()
+  if (!str) return null
+
+  const hasTimezone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(str)
+  const isoNoTz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/
+
+  if (!hasTimezone && isoNoTz.test(str)) {
+    const asUtc = new Date(`${str}Z`)
+    if (!Number.isNaN(asUtc.getTime())) return asUtc
+  }
+
+  const parsed = new Date(str)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
 
 function pad2(n) {
   return String(n).padStart(2, '0')
+}
+
+function buildDayString(y, m, d) {
+  if (![y, m, d].every((x) => Number.isFinite(x))) return ''
+  return `${String(y).padStart(4, '0')}-${pad2(m)}-${pad2(d)}`
+}
+
+const getTimeZoneOffsetMinutes = (timeZone, date = new Date()) => {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short',
+    })
+
+    const tzName = dtf.formatToParts(date).find((p) => p.type === 'timeZoneName')?.value
+    const match = tzName?.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/)
+
+    if (match) {
+      const sign = match[1].startsWith('-') ? -1 : 1
+      const hours = Math.abs(parseInt(match[1], 10))
+      const minutes = match[2] ? parseInt(match[2], 10) : 0
+      return sign * (hours * 60 + minutes)
+    }
+  } catch (err) {
+    console.error('No se pudo resolver zona horaria, usando offset fijo -04:00', err)
+  }
+
+  return -4 * 60 // fallback America/Santo_Domingo
+}
+
+const toSantoDomingoParts = (value) => {
+  const date = parseDateValue(value)
+  if (!date) return null
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SANTO_DOMINGO_TZ,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const parts = formatter.formatToParts(date).reduce((acc, part) => {
+    if (['year', 'month', 'day', 'hour', 'minute'].includes(part.type)) {
+      acc[part.type] = Number(part.value)
+    }
+    return acc
+  }, {})
+
+  if (!['year', 'month', 'day', 'hour'].every((k) => Number.isFinite(parts[k]))) return null
+
+  const dayOfWeek = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay()
+
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: Number.isFinite(parts.minute) ? parts.minute : 0,
+    dayOfWeek,
+  }
+}
+
+function getTodayDayString() {
+  const parts = toSantoDomingoParts(new Date())
+  if (!parts) return ''
+  return buildDayString(parts.year, parts.month, parts.day)
 }
 
 function getDowFromDateString(dateStr) {
@@ -95,8 +153,15 @@ function getHoursForDate(dateStr) {
 }
 
 function buildScheduledAt(dateStr, hour) {
-  // Enviar como string sin timezone: "YYYY-MM-DDTHH:00:00"
   if (!dateStr || hour == null) return ''
+
+  // Convertimos explícitamente a UTC para evitar desfasajes de zona horaria.
+  const localDate = buildLocalDateFromDayHour(dateStr, hour)
+  if (localDate instanceof Date && !Number.isNaN(localDate.getTime())) {
+    return localDate.toISOString() // ej: 2024-10-10T13:00:00.000Z (09:00 RD)
+  }
+
+  // Fallback: formato local sin zona horaria
   return `${dateStr}T${pad2(hour)}:00:00`
 }
 
@@ -104,16 +169,18 @@ function buildLocalDateFromDayHour(dayStr, hour) {
   if (!dayStr || hour == null) return null
   const [y, m, d] = String(dayStr).split('-').map(Number)
   if (![y, m, d].every((x) => Number.isFinite(x))) return null
-  return new Date(y, m - 1, d, Number(hour), 0, 0, 0)
+
+  const utcMs = Date.UTC(y, m - 1, d, Number(hour), 0, 0)
+  const offsetMinutes = getTimeZoneOffsetMinutes(SANTO_DOMINGO_TZ, new Date(utcMs))
+  return new Date(utcMs - offsetMinutes * 60 * 1000)
 }
 
 function extractLocalDayHour(value) {
   if (!value) return { day: '', hour: null }
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return { day: '', hour: null }
-  const day = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-  const hour = d.getHours()
-  return { day, hour }
+  const parts = toSantoDomingoParts(value)
+  if (!parts) return { day: '', hour: null }
+  const day = buildDayString(parts.year, parts.month, parts.day)
+  return { day, hour: parts.hour }
 }
 
 function getApiMessage(err, fallback) {
@@ -122,24 +189,53 @@ function getApiMessage(err, fallback) {
 
 function formatDate(value) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
-  return d.toLocaleDateString('es-DO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+
+  const parseDateOnly = (str) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str.trim())
+    if (!match) return null
+    const [_, y, m, d] = match.map(Number)
+    if (![y, m, d].every(Number.isFinite)) return null
+    const utc = Date.UTC(y, m - 1, d, 12, 0, 0, 0)
+    return new Date(utc)
+  }
+
+  let dateObj = null
+
+  if (typeof value === 'string') {
+    dateObj = parseDateOnly(value)
+  }
+
+  if (!dateObj) {
+    const parsed = parseDateValue(value)
+    if (!parsed) return String(value).slice(0, 10)
+    dateObj = parsed
+  }
+
+  return dateObj.toLocaleDateString('es-DO', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: SANTO_DOMINGO_TZ,
+  })
 }
 
 function formatTime(value) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value).slice(11, 16)
-  return d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })
+  const d = parseDateValue(value)
+  if (!d) return String(value).slice(11, 16)
+  return d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', timeZone: SANTO_DOMINGO_TZ })
 }
 
 // ✅ Reglas de horario + BLOQUEO 12:00 Lun–Vie
 function isWithinBusinessHours(dateObj) {
   if (!dateObj) return { ok: false, reason: 'Fecha/hora inválida.' }
 
-  const dayOfWeek = dateObj.getDay() // 0 dom, 6 sáb
-  const hh = dateObj.getHours()
+  const parts = toSantoDomingoParts(dateObj)
+  if (!parts) return { ok: false, reason: 'Fecha/hora inválida.' }
+
+  const dayOfWeek = parts.dayOfWeek // 0 dom, 6 sáb
+  const hh = parts.hour
 
   // Domingo cerrado
   if (dayOfWeek === 0) return { ok: false, reason: 'Domingo no laborable.' }
@@ -162,6 +258,21 @@ function isSameLocalDay(a, b) {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   )
+}
+
+function normalizeDayString(value, fallback = '') {
+  if (!value) return fallback
+  const [y, m, d] = String(value).split('-').map(Number)
+  if (![y, m, d].every((x) => Number.isFinite(x))) return fallback
+  return buildDayString(y, m, d)
+}
+
+function shiftDay(dayStr, delta) {
+  const normalized = normalizeDayString(dayStr, getTodayDayString())
+  const [y, m, d] = normalized.split('-').map(Number)
+  const base = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  base.setUTCDate(base.getUTCDate() + delta)
+  return buildDayString(base.getUTCFullYear(), base.getUTCMonth() + 1, base.getUTCDate())
 }
 
 // ✅ Normaliza citas de API a un formato estable (camelCase)
@@ -222,26 +333,39 @@ function normalizeAvailability(raw, defaultSlotsPerHour) {
   let time = ''
   const str = String(timeRaw || '')
   if (str.includes('T')) {
-    const d = new Date(str)
-    if (!Number.isNaN(d.getTime())) time = `${pad2(d.getHours())}:00`
+    const d = parseDateValue(str)
+    if (d) time = `${pad2(d.getHours())}:00`
   } else if (str) {
     const [hh] = str.split(':')
     time = `${pad2(Number(hh))}:00`
   }
 
+  const id = resolveEntityId(raw)
+
+  const toNumber = (value) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const capacity =
+    toNumber(raw?.slots ?? raw?.Slots ?? raw?.capacity ?? raw?.Capacity) ??
+    defaultSlotsPerHour
+
+  const availableSlots =
+    toNumber(raw?.availableSlots ?? raw?.AvailableSlots ?? raw?.remaining ?? raw?.Remaining ?? raw?.available ?? raw?.Available) ??
+    capacity
+
+  const isCustomFlag = raw?.isCustom ?? raw?.IsCustom
+  const isCustom = typeof isCustomFlag === 'boolean' ? isCustomFlag : Boolean(id)
+
   return {
-    id: resolveEntityId(raw),
+    id,
     day,
     time,
-    slots: Number(
-      raw?.slots ??
-      raw?.Slots ??
-      raw?.availableSlots ??
-      raw?.AvailableSlots ??
-      raw?.capacity ??
-      raw?.Capacity ??
-      defaultSlotsPerHour
-    ),
+    slots: capacity,
+    capacity,
+    availableSlots,
+    isCustom,
   }
 }
 
@@ -277,15 +401,33 @@ export default function Appointments() {
   const [statusSavingId, setStatusSavingId] = useState(null)
   const [statusError, setStatusError] = useState('')
 
+  const [selectedDay, setSelectedDay] = useState(() => getTodayDayString())
+
+  const appointmentsForSelectedDay = useMemo(() => {
+    const normalizedDay = normalizeDayString(selectedDay, '')
+    if (!normalizedDay) return items
+
+    return items.filter((it) => {
+      const { day } = extractLocalDayHour(it.scheduledAt)
+      return day === normalizedDay
+    })
+  }, [items, selectedDay])
+
+  const availabilityForSelectedDay = useMemo(() => {
+    const normalizedDay = normalizeDayString(selectedDay, '')
+    if (!normalizedDay) return availability
+    return availability.filter((slot) => normalizeDayString(slot.day, '') === normalizedDay)
+  }, [availability, selectedDay])
+
   const nextAppointment = useMemo(() => {
     if (!canManageAppointments) return null
 
-    const candidates = items
+    const candidates = appointmentsForSelectedDay
       .map((it) => {
-        const parsed = new Date(it.scheduledAt)
+        const parsed = parseDateValue(it.scheduledAt)
         return {
           ...it,
-          _date: Number.isNaN(parsed.getTime()) ? null : parsed,
+          _date: parsed,
           status: normalizeStatus(it.status) || it.status,
         }
       })
@@ -298,7 +440,7 @@ export default function Appointments() {
     const future = candidates.find((it) => it._date.getTime() >= now)
     const pick = future || candidates[0]
     return { ...pick, status: normalizeStatus(pick.status) || pick.status }
-  }, [canManageAppointments, items])
+  }, [appointmentsForSelectedDay, canManageAppointments])
 
   // ✅ Nuevo: guardamos DÍA + HORA (sin minutos)
   const [formData, setFormData] = useState({
@@ -322,7 +464,7 @@ export default function Appointments() {
       .map((x) => normalizeStatus(x.status) || x.status)
       .filter(Boolean)
     const set = new Set([...fromData, ...baseStatusOptions])
-    return Array.from(set)
+    return Array.from(set).filter((s) => APPOINTMENT_STATUSES.includes(normalizeStatus(s) || s))
   }, [items])
 
   const availableTypeOptions = formData.type && !typeOptions.includes(formData.type)
@@ -414,25 +556,54 @@ export default function Appointments() {
     setEditingItem(null)
   }
 
-  const getCapacityForSlot = (day, hourStr) => {
-    if (!day || !hourStr) return defaultSlotsPerHour
-    const slot = availability.find((entry) => entry.day === day && entry.time === hourStr)
-    const n = slot?.slots
-    return Number.isFinite(n) ? n : defaultSlotsPerHour
+  const openProjectionTab = useCallback(() => {
+    const url = `${window.location.origin}/app/next-turn-display`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }, [])
+
+  const parseNumber = (value) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
   }
 
-  const getBookedCount = (day, hourStr, excludeId) => {
-    return items.filter((it) => {
-      if (excludeId && it.id === excludeId) return false
-      const d = new Date(it.scheduledAt)
-      if (Number.isNaN(d.getTime())) return false
-      const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-      const itHour = `${pad2(d.getHours())}:00`
-      return itDay === day && itHour === hourStr
-    }).length
+  const findAvailabilitySlot = (day, hourStr) => {
+    if (!day || !hourStr) return null
+    return availability.find((entry) => entry.day === day && entry.time === hourStr) || null
   }
+
+  const getCapacityForSlot = (day, hourStr) => {
+    const slot = findAvailabilitySlot(day, hourStr)
+    const n = slot?.capacity ?? slot?.slots ?? slot?.availableSlots
+    return parseNumber(n) ?? defaultSlotsPerHour
+  }
+
+  const matchesDayAndHour = (scheduledAt, day, hourStr) => {
+    const d = parseDateValue(scheduledAt)
+    if (!d) return false
+    const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const itHour = `${pad2(d.getHours())}:00`
+    return itDay === day && itHour === hourStr
+  }
+
+  const getBookedCount = (day, hourStr, excludeId) =>
+    items.filter((it) => {
+      if (excludeId && it.id === excludeId) return false
+      return matchesDayAndHour(it.scheduledAt, day, hourStr)
+    }).length
 
   const getRemainingSlots = (day, hourStr, excludeId) => {
+    const slot = findAvailabilitySlot(day, hourStr)
+    if (slot) {
+      const fromApi = parseNumber(slot.availableSlots)
+      if (fromApi != null) {
+        let remaining = fromApi
+        if (excludeId && items.some((it) => it.id === excludeId && matchesDayAndHour(it.scheduledAt, day, hourStr))) {
+          remaining += 1
+        }
+        return Math.max(remaining, 0)
+      }
+    }
+
     const cap = getCapacityForSlot(day, hourStr)
     const booked = getBookedCount(day, hourStr, excludeId)
     return Math.max(cap - booked, 0)
@@ -524,6 +695,7 @@ export default function Appointments() {
 
       closeForm()
       fetchData()
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setFormError(getApiMessage(err, 'No pudimos guardar la cita. Revisa los datos e intenta nuevamente.'))
@@ -541,6 +713,7 @@ export default function Appointments() {
     try {
       await api.delete(`/api/appointments/${id}`)
       fetchData()
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setError(getApiMessage(err, 'No pudimos eliminar la cita.'))
@@ -552,7 +725,7 @@ export default function Appointments() {
     if (!canManageAppointments || isPatient) return
     if (!row?.id) return
 
-    const statusToSend = normalizeStatus(newStatus) || String(newStatus || '').trim()
+    const statusToSend = toAllowedStatus(newStatus)
     if (!statusToSend) {
       setStatusError('Selecciona un estado válido.')
       return
@@ -576,6 +749,7 @@ export default function Appointments() {
       await api.put(`/api/appointments/${row.id}`, payload)
 
       setItems((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: payload.status } : x)))
+      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setStatusError(getApiMessage(err, 'No pudimos cambiar el estado.'))
@@ -622,7 +796,7 @@ export default function Appointments() {
       id: slot.id,
       day: slot.day || '',
       time: slot.time || '',
-      slots: Number(slot.slots) || defaultSlotsPerHour,
+      slots: Number(slot.capacity ?? slot.slots) || defaultSlotsPerHour,
     })
   }
 
@@ -772,26 +946,75 @@ export default function Appointments() {
             <h3 className="text-lg font-semibold text-gray-900">{isPatient ? 'Historial de citas' : 'Calendario de atención'}</h3>
             <p className="text-sm text-gray-600">{calendarSubtitle}</p>
           </div>
-          {canEditAppointments && (
-            <button
-              onClick={() => openForm(null)}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-            >
-              {isPatient ? 'Agendar cita' : 'Agregar cita'}
-            </button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {canManageAppointments && !isPatient && (
+              <button
+                type="button"
+                onClick={openProjectionTab}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+              >
+                Proyectar próximo turno
+              </button>
+            )}
+            {canEditAppointments && (
+              <button
+                onClick={() => openForm(null)}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                {isPatient ? 'Agendar cita' : 'Agregar cita'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 space-y-3">
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDay((prev) => shiftDay(prev, -1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Día anterior
+              </button>
+              <input
+                type="date"
+                value={normalizeDayString(selectedDay, '')}
+                onChange={(e) => setSelectedDay(normalizeDayString(e.target.value, getTodayDayString()))}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedDay((prev) => shiftDay(prev, 1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Siguiente día
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDay(getTodayDayString())}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Hoy
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Mostrando citas del <span className="font-semibold text-gray-900">{formatDate(selectedDay)}</span>.
+            </p>
+          </div>
+
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {statusError && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{statusError}</div>}
 
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : items.length > 0 ? (
-            <Table columns={appointmentColumns} data={items} />
+          ) : appointmentsForSelectedDay.length > 0 ? (
+            <Table columns={appointmentColumns} data={appointmentsForSelectedDay} />
           ) : (
-            <div className="text-sm text-gray-500">{isPatient ? 'Aún no tienes citas programadas.' : 'No hay citas registradas.'}</div>
+            <div className="text-sm text-gray-500">
+              {isPatient ? 'No tienes citas para este día.' : 'No hay citas registradas para este día.'}
+            </div>
           )}
         </div>
       </div>
@@ -801,6 +1024,9 @@ export default function Appointments() {
           <h3 className="text-lg font-semibold text-gray-900">Disponibilidad por día y hora</h3>
           <p className="text-sm text-gray-600">
             Ajusta los cupos disponibles por franja horaria (por hora exacta, sin minutos).
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Mostrando disponibilidad del <span className="font-semibold text-gray-900">{formatDate(selectedDay)}</span>.
           </p>
 
           <form onSubmit={handleAvailabilitySubmit} className="mt-4 grid gap-4 md:grid-cols-4">
@@ -888,12 +1114,31 @@ export default function Appointments() {
             {availabilityError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{availabilityError}</div>}
             {availabilityLoading ? (
               <div className="text-sm text-gray-600">Cargando disponibilidad...</div>
-            ) : availability.length > 0 ? (
+            ) : availabilityForSelectedDay.length > 0 ? (
               <Table
                 columns={[
                   { key: 'day', header: 'Día', render: (row) => formatDate(row.day) },
                   { key: 'time', header: 'Hora', render: (row) => row.time || '-' },
-                  { key: 'slots', header: 'Citas disponibles', render: (row) => Number.isFinite(row.slots) ? row.slots : defaultSlotsPerHour },
+                  {
+                    key: 'availableSlots',
+                    header: 'Citas disponibles',
+                    render: (row) => {
+                      const available = parseNumber(row.availableSlots)
+                      const capacity = parseNumber(row.capacity ?? row.slots)
+                      if (available != null && capacity != null) return `${available} / ${capacity}`
+                      return available ?? capacity ?? defaultSlotsPerHour
+                    },
+                  },
+                  {
+                    key: 'capacity',
+                    header: 'Cupo base',
+                    render: (row) => parseNumber(row.capacity ?? row.slots) ?? defaultSlotsPerHour,
+                  },
+                  {
+                    key: 'isCustom',
+                    header: 'Tipo',
+                    render: (row) => (row.isCustom ? 'Personalizada' : 'Genérica'),
+                  },
                   {
                     key: 'actions',
                     header: 'Acciones',
@@ -904,10 +1149,10 @@ export default function Appointments() {
                     ),
                   },
                 ]}
-                data={availability}
+                data={availabilityForSelectedDay}
               />
             ) : (
-              <div className="text-sm text-gray-500">Agrega cupos para comenzar a gestionar la disponibilidad.</div>
+              <div className="text-sm text-gray-500">No hay cupos configurados para este día.</div>
             )}
           </div>
         </div>
@@ -1054,9 +1299,3 @@ export default function Appointments() {
     </section>
   )
 }
-
-
-
-
-
-

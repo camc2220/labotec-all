@@ -23,6 +23,9 @@ public class PatientsMeController : ControllerBase
         _db = db;
     }
 
+    private Task<int> GetDefaultMaxPatientsAsync()
+        => AppointmentAvailabilityHelper.GetDefaultCapacityAsync(_db);
+
     private static bool TryValidateExactHour(DateTime utc, out string error)
     {
         if (utc.Minute != 0 || utc.Second != 0 || utc.Millisecond != 0)
@@ -44,13 +47,13 @@ public class PatientsMeController : ControllerBase
 
         if (slot.HasValue) return slot.Value;
 
+        return await GetDefaultMaxPatientsAsync();
+    }
 
-        var max = await _db.SchedulingSettings.AsNoTracking()
-            .Where(x => x.Id == 1)
-            .Select(x => x.MaxPatientsPerHour)
-            .FirstOrDefaultAsync();
-
-        return max > 0 ? max : 10;
+    private async Task EnsureGenericAvailabilityAsync(DateTime bucketStartUtc)
+    {
+        var defaultCapacity = await GetDefaultMaxPatientsAsync();
+        await AppointmentAvailabilityHelper.EnsureGenericAvailabilityAsync(_db, bucketStartUtc, defaultCapacity);
     }
 
     private async Task<int> CountBlockingInHourBucket(DateTime scheduledAtBucketUtc, Guid? exceptId = null)
@@ -155,6 +158,8 @@ public class PatientsMeController : ControllerBase
         if (await HasHourDuplicate(patientId.Value, scheduledAtUtc))
             return Conflict("Ya tienes una cita en esa misma hora.");
 
+        await EnsureGenericAvailabilityAsync(scheduledAtUtc);
+
         var entity = new Labotec.Api.Domain.Appointment
         {
             PatientId = patientId.Value,
@@ -219,6 +224,8 @@ public class PatientsMeController : ControllerBase
         if (await HasHourDuplicate(patientId.Value, scheduledAtUtc, exceptId: appointment.Id))
             return Conflict("Ya tienes otra cita en esa misma hora.");
 
+        await EnsureGenericAvailabilityAsync(scheduledAtUtc);
+
         appointment.ScheduledAt = scheduledAtUtc;
         appointment.Type = dto.Type.Trim();
         appointment.Notes = dto.Notes;
@@ -265,6 +272,7 @@ public class PatientsMeController : ControllerBase
                 r.TestName,
                 r.ResultValue,
                 r.Unit,
+                r.CreatedByName,
                 r.ReleasedAt,
                 r.PdfUrl))
             .ToListAsync();

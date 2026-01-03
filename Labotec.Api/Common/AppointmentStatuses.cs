@@ -36,8 +36,9 @@ public static class AppointmentStatuses
 
         return from switch
         {
-            Scheduled => to is CheckedIn or Canceled or NoShow,
-            CheckedIn => to is InProgress or Canceled or NoShow,
+            // Staff puede cambiar directamente a un estado posterior desde la tabla.
+            Scheduled => to is CheckedIn or InProgress or Completed or Canceled or NoShow,
+            CheckedIn => to is InProgress or Completed or Canceled or NoShow,
             InProgress => to is Completed or Canceled,
             Completed => false,
             NoShow => false,

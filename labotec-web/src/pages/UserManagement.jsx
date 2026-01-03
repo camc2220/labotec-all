@@ -374,7 +374,6 @@ export default function UserManagement() {
   const columns = useMemo(() => {
     if (!isAdmin) return []
     return [
-      { key: 'name', header: 'Nombre' },
       { key: 'email', header: 'Correo electrónico' },
       {
         key: 'edit',

@@ -25,6 +25,11 @@ public class LabTest
     public decimal? DefaultPrice { get; set; }
 
     /// <summary>
+    /// Rango de referencia (texto que permita min/max o descripciones).
+    /// </summary>
+    public string? ReferenceValue { get; set; }
+
+    /// <summary>
     /// Permite desactivar pruebas sin borrarlas físicamente.
     /// </summary>
     public bool Active { get; set; } = true;

@@ -309,6 +309,11 @@ namespace Labotec.Api.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
                     b.Property<string>("TestName")
                         .IsRequired()
                         .HasMaxLength(160)

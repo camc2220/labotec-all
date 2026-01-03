@@ -286,7 +286,7 @@ export default function Results() {
         { header: 'Prueba', accessor: row => row.testName ?? '' },
         { header: 'Resultado', accessor: row => row.resultValue ?? '' },
         { header: 'Unidad', accessor: row => row.unit ?? '' },
-        { header: 'Valor de referencia', accessor: row => resolveReferenceValue(row) || '—' },
+        { header: 'Rango de referencia', accessor: row => resolveReferenceValue(row) || '—' },
         { header: 'Registrado por', accessor: row => row.createdByName ?? 'Desconocido' },
         { header: 'Liberado', accessor: row => (row.releasedAt ? formatDateTime(row.releasedAt) : '') },
       ],
@@ -327,7 +327,7 @@ export default function Results() {
     { key: 'unit', header: 'Unidad' },
     {
       key: 'referenceValue',
-      header: 'Valor de referencia',
+      header: 'Rango de referencia',
       render: row => resolveReferenceValue(row) || '—',
     },
     { key: 'createdByName', header: 'Registrado por' },
@@ -525,7 +525,7 @@ export default function Results() {
                       </div>
                     </div>
                     {referenceValue && (
-                      <p className="mt-2 text-xs text-emerald-700">Valor de referencia sugerido: {referenceValue}</p>
+                      <p className="mt-2 text-xs text-emerald-700">Rango de referencia sugerido: {referenceValue}</p>
                     )}
                     <div className="mt-3 grid gap-4 md:grid-cols-2">
                       <div>
