@@ -132,9 +132,29 @@ function getApiMessage(err, fallback) {
 
 function formatDate(value) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
-  return d.toLocaleDateString('es-DO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+
+  const parseDateOnly = (str) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str.trim())
+    if (!match) return null
+    const [_, y, m, d] = match.map(Number)
+    if (![y, m, d].every(Number.isFinite)) return null
+    const local = new Date(y, m - 1, d, 12, 0, 0, 0) // mediodía para evitar TZ anteriores
+    return Number.isNaN(local.getTime()) ? null : local
+  }
+
+  let dateObj = null
+
+  if (typeof value === 'string') {
+    dateObj = parseDateOnly(value)
+  }
+
+  if (!dateObj) {
+    const d = new Date(value)
+    if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
+    dateObj = d
+  }
+
+  return dateObj.toLocaleDateString('es-DO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 function formatTime(value) {
