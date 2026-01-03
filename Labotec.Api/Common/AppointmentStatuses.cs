@@ -1,4 +1,7 @@
-﻿namespace Labotec.Api.Common;
+﻿using System;
+using System.Collections.Generic;
+
+namespace Labotec.Api.Common;
 
 public static class AppointmentStatuses
 {
@@ -20,16 +23,46 @@ public static class AppointmentStatuses
         Scheduled, CheckedIn, InProgress
     };
 
-    // Para queries EF traducibles
+    // Para queries EF traducibles (NO lo cambies a HashSet aquí)
     public static readonly string[] BlockingForQuery = { Scheduled, CheckedIn, InProgress };
 
     public static bool IsBlocking(string? status)
         => Blocking.Contains((status ?? string.Empty).Trim());
 
+    public static string Normalize(string? status)
+    {
+        var s = (status ?? string.Empty).Trim();
+
+        if (s.Equals(Scheduled, StringComparison.OrdinalIgnoreCase)) return Scheduled;
+        if (s.Equals(CheckedIn, StringComparison.OrdinalIgnoreCase)) return CheckedIn;
+        if (s.Equals(InProgress, StringComparison.OrdinalIgnoreCase)) return InProgress;
+        if (s.Equals(Completed, StringComparison.OrdinalIgnoreCase)) return Completed;
+        if (s.Equals(NoShow, StringComparison.OrdinalIgnoreCase)) return NoShow;
+        if (s.Equals(Canceled, StringComparison.OrdinalIgnoreCase)) return Canceled;
+
+        return s;
+    }
+
+    public static int GetProgressPercent(string? status)
+    {
+        var s = Normalize(status);
+
+        return s switch
+        {
+            Scheduled => 0,
+            CheckedIn => 33,
+            InProgress => 66,
+            Completed => 100,
+            NoShow => 100,
+            Canceled => 100,
+            _ => 0
+        };
+    }
+
     public static bool CanTransition(string from, string to)
     {
-        from = (from ?? "").Trim();
-        to = (to ?? "").Trim();
+        from = Normalize(from);
+        to = Normalize(to);
 
         if (!All.Contains(from) || !All.Contains(to)) return false;
         if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return true;
@@ -43,6 +76,24 @@ public static class AppointmentStatuses
             Completed => false,
             NoShow => false,
             Canceled => false,
+            _ => false
+        };
+    }
+
+    // ✅ NUEVO: rollback controlado
+    public static bool CanRevert(string from, string to)
+    {
+        from = Normalize(from);
+        to = Normalize(to);
+
+        if (!All.Contains(from) || !All.Contains(to)) return false;
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return (from, to) switch
+        {
+            (CheckedIn, Scheduled) => true,
+            (InProgress, CheckedIn) => true,
+            (Completed, InProgress) => true,
             _ => false
         };
     }

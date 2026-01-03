@@ -1,3 +1,5 @@
+ï»¿using System;
+using System.Collections.Generic;
 
 namespace Labotec.Api.Domain;
 
@@ -17,7 +19,7 @@ public class Appointment
     // Estado controlado (Scheduled, CheckedIn, InProgress, Completed, NoShow, Canceled)
     public string Status { get; set; } = Common.AppointmentStatuses.Scheduled;
 
-    // Auditoría del flujo (quién y cuándo)
+    // AuditorÃ­a del flujo (quiÃ©n y cuÃ¡ndo)
     public DateTime? CheckedInAt { get; set; }
     public string? CheckedInByUserId { get; set; }
 
@@ -32,4 +34,7 @@ public class Appointment
 
     public DateTime? NoShowAt { get; set; }
     public string? NoShowByUserId { get; set; }
+
+    // âœ… NUEVO: historial
+    public ICollection<AppointmentStatusHistory> StatusHistory { get; set; } = new List<AppointmentStatusHistory>();
 }

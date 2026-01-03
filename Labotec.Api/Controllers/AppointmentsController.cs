@@ -394,6 +394,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Labotec.Api.Common;
 using Labotec.Api.Data;
+using Labotec.Api.Domain;
 using Labotec.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -451,7 +452,7 @@ public class AppointmentsController : ControllerBase
         await AppointmentAvailabilityHelper.EnsureGenericAvailabilityAsync(_db, bucketStartUtc, defaultCapacity);
     }
 
-    private async Task<int> CountBlockingInHourBucket(DateTime scheduledAtBucketUtc, System.Guid? exceptId = null)
+    private async Task<int> CountBlockingInHourBucket(DateTime scheduledAtBucketUtc, Guid? exceptId = null)
     {
         var (startUtc, endUtc) = SchedulingRules.GetLocalHourBucketUtcRange(scheduledAtBucketUtc);
 
@@ -465,7 +466,7 @@ public class AppointmentsController : ControllerBase
     }
 
     // ✅ Duplicado por HORA (no por DateTime exacto)
-    private async Task<bool> HasHourDuplicate(System.Guid patientId, DateTime scheduledAtBucketUtc, System.Guid? exceptId = null)
+    private async Task<bool> HasHourDuplicate(Guid patientId, DateTime scheduledAtBucketUtc, Guid? exceptId = null)
     {
         var (startUtc, endUtc) = SchedulingRules.GetLocalHourBucketUtcRange(scheduledAtBucketUtc);
 
@@ -479,46 +480,142 @@ public class AppointmentsController : ControllerBase
         return await q.AnyAsync();
     }
 
-    private static void ApplyStatusChange(Domain.Appointment a, string newStatus, string actorUserId)
+    // =========================
+    // HISTORIAL
+    // =========================
+    private void AddStatusHistory(Guid appointmentId, string fromStatus, string toStatus, string actorUserId, string? reason)
     {
-        var now = System.DateTime.UtcNow;
+        _db.Set<AppointmentStatusHistory>().Add(new AppointmentStatusHistory
+        {
+            AppointmentId = appointmentId,
+            FromStatus = AppointmentStatuses.Normalize(fromStatus),
+            ToStatus = AppointmentStatuses.Normalize(toStatus),
+            ChangedAtUtc = DateTime.UtcNow,
+            ChangedByUserId = string.IsNullOrWhiteSpace(actorUserId) ? null : actorUserId,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
+        });
+    }
 
-        if (!AppointmentStatuses.CanTransition(a.Status, newStatus))
-            throw new System.InvalidOperationException($"Transición inválida: {a.Status} -> {newStatus}");
+    private void ApplyStatusChange(Appointment a, string newStatus, string actorUserId)
+    {
+        var now = DateTime.UtcNow;
 
-        if (string.Equals(a.Status, newStatus, System.StringComparison.OrdinalIgnoreCase))
+        var from = AppointmentStatuses.Normalize(a.Status);
+        var to = AppointmentStatuses.Normalize(newStatus);
+
+        if (!AppointmentStatuses.CanTransition(from, to))
+            throw new InvalidOperationException($"Transición inválida: {from} -> {to}");
+
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
             return;
 
-        a.Status = newStatus;
+        // ✅ historial (forward)
+        AddStatusHistory(a.Id, from, to, actorUserId, reason: null);
 
-        if (newStatus == AppointmentStatuses.CheckedIn)
+        a.Status = to;
+
+        if (to == AppointmentStatuses.CheckedIn)
         {
             a.CheckedInAt ??= now;
             a.CheckedInByUserId ??= actorUserId;
         }
-        else if (newStatus == AppointmentStatuses.InProgress)
+        else if (to == AppointmentStatuses.InProgress)
         {
             a.StartedAt ??= now;
             a.StartedByUserId ??= actorUserId;
         }
-        else if (newStatus == AppointmentStatuses.Completed)
+        else if (to == AppointmentStatuses.Completed)
         {
             a.CompletedAt ??= now;
             a.CompletedByUserId ??= actorUserId;
         }
-        else if (newStatus == AppointmentStatuses.Canceled)
+        else if (to == AppointmentStatuses.Canceled)
         {
             a.CanceledAt ??= now;
             a.CanceledByUserId ??= actorUserId;
         }
-        else if (newStatus == AppointmentStatuses.NoShow)
+        else if (to == AppointmentStatuses.NoShow)
         {
             a.NoShowAt ??= now;
             a.NoShowByUserId ??= actorUserId;
         }
     }
 
-    private async Task<AppointmentReadDto> ReadDto(System.Guid id)
+    // ✅ NUEVO: rollback real
+    private void ApplyStatusRevert(Appointment a, string toStatus, string actorUserId, string reason)
+    {
+        var now = DateTime.UtcNow;
+
+        var from = AppointmentStatuses.Normalize(a.Status);
+        var to = AppointmentStatuses.Normalize(toStatus);
+
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new InvalidOperationException("Reason es obligatorio para revertir.");
+
+        if (!AppointmentStatuses.CanRevert(from, to))
+            throw new InvalidOperationException($"Rollback inválido: {from} -> {to}");
+
+        // NO permitir desde cerrados aquí
+        if (from is "Canceled" or "NoShow")
+            throw new InvalidOperationException("No se puede revertir una cita cerrada (Canceled/NoShow) desde este endpoint.");
+
+        // ✅ historial (rollback) con reason
+        AddStatusHistory(a.Id, from, to, actorUserId, reason);
+
+        a.Status = to;
+
+        // Limpieza de timestamps según a dónde vuelves
+        if (to == AppointmentStatuses.Scheduled)
+        {
+            a.CheckedInAt = null;
+            a.CheckedInByUserId = null;
+
+            a.StartedAt = null;
+            a.StartedByUserId = null;
+
+            a.CompletedAt = null;
+            a.CompletedByUserId = null;
+
+            a.CanceledAt = null;
+            a.CanceledByUserId = null;
+
+            a.NoShowAt = null;
+            a.NoShowByUserId = null;
+        }
+        else if (to == AppointmentStatuses.CheckedIn)
+        {
+            a.StartedAt = null;
+            a.StartedByUserId = null;
+
+            a.CompletedAt = null;
+            a.CompletedByUserId = null;
+
+            a.CanceledAt = null;
+            a.CanceledByUserId = null;
+
+            a.NoShowAt = null;
+            a.NoShowByUserId = null;
+
+            a.CheckedInAt ??= now;
+            a.CheckedInByUserId ??= actorUserId;
+        }
+        else if (to == AppointmentStatuses.InProgress)
+        {
+            a.CompletedAt = null;
+            a.CompletedByUserId = null;
+
+            a.CanceledAt = null;
+            a.CanceledByUserId = null;
+
+            a.NoShowAt = null;
+            a.NoShowByUserId = null;
+
+            a.StartedAt ??= now;
+            a.StartedByUserId ??= actorUserId;
+        }
+    }
+
+    private async Task<AppointmentReadDto> ReadDto(Guid id)
     {
         var dto = await _db.Appointments.AsNoTracking()
             .Include(a => a.Patient)
@@ -537,7 +634,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<AppointmentReadDto>> GetOne(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> GetOne(Guid id)
     {
         var currentPatientId = User.GetPatientId();
 
@@ -571,9 +668,9 @@ public class AppointmentsController : ControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<AppointmentReadDto>>> Get(
-        [FromQuery] System.Guid? patientId,
-        [FromQuery] System.DateTime? from,
-        [FromQuery] System.DateTime? to,
+        [FromQuery] Guid? patientId,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
         [FromQuery] string? status,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
@@ -626,13 +723,12 @@ public class AppointmentsController : ControllerBase
     [Authorize(Roles = "Admin,Recepcion")]
     public async Task<ActionResult<AppointmentReadDto>> Create([FromBody] AppointmentCreateDto dto)
     {
-        if (dto.PatientId == System.Guid.Empty) return BadRequest("PatientId es requerido");
+        if (dto.PatientId == Guid.Empty) return BadRequest("PatientId es requerido");
         if (string.IsNullOrWhiteSpace(dto.Type)) return BadRequest("Type es requerido");
 
         var patient = await _db.Patients.FindAsync(dto.PatientId);
         if (patient is null) return BadRequest("Paciente no existe");
 
-        // ✅ Normaliza + valida exact hour
         var rawUtc = SchedulingRules.NormalizeToUtc(dto.ScheduledAt);
 
         if (!TryValidateExactHour(rawUtc, out var errExactHour))
@@ -641,7 +737,7 @@ public class AppointmentsController : ControllerBase
         var (bucketStartUtc, _) = SchedulingRules.GetLocalHourBucketUtcRange(rawUtc);
         var scheduledAtUtc = bucketStartUtc;
 
-        if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, System.DateTime.UtcNow, out var errPast))
+        if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
             return BadRequest(errPast);
 
         if (!SchedulingRules.TryValidateBusinessHours(scheduledAtUtc, out var errHours))
@@ -657,7 +753,7 @@ public class AppointmentsController : ControllerBase
 
         await EnsureGenericAvailabilityAsync(scheduledAtUtc);
 
-        var entity = new Domain.Appointment
+        var entity = new Appointment
         {
             PatientId = dto.PatientId,
             ScheduledAt = scheduledAtUtc,
@@ -684,7 +780,7 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<IActionResult> Update(System.Guid id, [FromBody] AppointmentUpdateDto dto)
+    public async Task<IActionResult> Update(Guid id, [FromBody] AppointmentUpdateDto dto)
     {
         var a = await _db.Appointments.Include(x => x.Patient).FirstOrDefaultAsync(x => x.Id == id);
         if (a is null) return NotFound();
@@ -705,14 +801,13 @@ public class AppointmentsController : ControllerBase
 
         if (scheduledChanged)
         {
-            if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, System.DateTime.UtcNow, out var errPast))
+            if (!SchedulingRules.TryValidateNotPast(scheduledAtUtc, DateTime.UtcNow, out var errPast))
                 return BadRequest(errPast);
 
             if (!SchedulingRules.TryValidateBusinessHours(scheduledAtUtc, out var errHours))
                 return BadRequest(errHours);
         }
 
-        // ✅ Regla de cupo: si el NUEVO status bloquea, valida cupo (aunque solo cambies status)
         var newIsBlocking = AppointmentStatuses.IsBlocking(dto.Status);
         var oldIsBlocking = AppointmentStatuses.IsBlocking(a.Status);
 
@@ -733,7 +828,7 @@ public class AppointmentsController : ControllerBase
         {
             ApplyStatusChange(a, dto.Status, GetCurrentUserId());
         }
-        catch (System.InvalidOperationException ex)
+        catch (InvalidOperationException ex)
         {
             return Conflict(ex.Message);
         }
@@ -748,13 +843,13 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}/check-in")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<AppointmentReadDto>> CheckIn(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> CheckIn(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
 
         try { ApplyStatusChange(a, AppointmentStatuses.CheckedIn, GetCurrentUserId()); }
-        catch (System.InvalidOperationException ex) { return Conflict(ex.Message); }
+        catch (InvalidOperationException ex) { return Conflict(ex.Message); }
 
         await _db.SaveChangesAsync();
         return Ok(await ReadDto(id));
@@ -762,13 +857,13 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}/start")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<AppointmentReadDto>> Start(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> Start(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
 
         try { ApplyStatusChange(a, AppointmentStatuses.InProgress, GetCurrentUserId()); }
-        catch (System.InvalidOperationException ex) { return Conflict(ex.Message); }
+        catch (InvalidOperationException ex) { return Conflict(ex.Message); }
 
         await _db.SaveChangesAsync();
         return Ok(await ReadDto(id));
@@ -776,13 +871,13 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}/complete")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<AppointmentReadDto>> Complete(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> Complete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
 
         try { ApplyStatusChange(a, AppointmentStatuses.Completed, GetCurrentUserId()); }
-        catch (System.InvalidOperationException ex) { return Conflict(ex.Message); }
+        catch (InvalidOperationException ex) { return Conflict(ex.Message); }
 
         await _db.SaveChangesAsync();
         return Ok(await ReadDto(id));
@@ -790,13 +885,13 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}/no-show")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<AppointmentReadDto>> NoShow(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> NoShow(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
 
         try { ApplyStatusChange(a, AppointmentStatuses.NoShow, GetCurrentUserId()); }
-        catch (System.InvalidOperationException ex) { return Conflict(ex.Message); }
+        catch (InvalidOperationException ex) { return Conflict(ex.Message); }
 
         await _db.SaveChangesAsync();
         return Ok(await ReadDto(id));
@@ -804,13 +899,73 @@ public class AppointmentsController : ControllerBase
 
     [HttpPut("{id:guid}/cancel")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<ActionResult<AppointmentReadDto>> Cancel(System.Guid id)
+    public async Task<ActionResult<AppointmentReadDto>> Cancel(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
 
         try { ApplyStatusChange(a, AppointmentStatuses.Canceled, GetCurrentUserId()); }
-        catch (System.InvalidOperationException ex) { return Conflict(ex.Message); }
+        catch (InvalidOperationException ex) { return Conflict(ex.Message); }
+
+        await _db.SaveChangesAsync();
+        return Ok(await ReadDto(id));
+    }
+
+    // 🔥 NUEVO: ROLLBACK ENDPOINT
+    [HttpPut("{id:guid}/revert")]
+    [Authorize(Roles = "Admin,Recepcion")]
+    public async Task<ActionResult<AppointmentReadDto>> Revert(Guid id, [FromBody] AppointmentRevertDto body)
+    {
+        if (body is null) return BadRequest("Body requerido.");
+        if (string.IsNullOrWhiteSpace(body.ToStatus)) return BadRequest("toStatus es requerido.");
+        if (string.IsNullOrWhiteSpace(body.Reason)) return BadRequest("reason es requerido.");
+
+        var a = await _db.Appointments.FirstOrDefaultAsync(x => x.Id == id);
+        if (a is null) return NotFound();
+
+        var from = AppointmentStatuses.Normalize(a.Status);
+        var to = AppointmentStatuses.Normalize(body.ToStatus);
+
+        // Solo se puede revertir hacia: Scheduled / CheckedIn / InProgress
+        if (to is not (AppointmentStatuses.Scheduled or AppointmentStatuses.CheckedIn or AppointmentStatuses.InProgress))
+            return BadRequest("toStatus inválido. Solo: Scheduled, CheckedIn, InProgress.");
+
+        // No revertir cerradas
+        if (from is AppointmentStatuses.Canceled or AppointmentStatuses.NoShow)
+            return Conflict("Esta cita está cerrada (Canceled/NoShow). No se revierte aquí.");
+
+        // Completed -> InProgress SOLO Admin
+        if (from == AppointmentStatuses.Completed && !User.IsInRole("Admin"))
+            return Forbid();
+
+        if (!AppointmentStatuses.CanRevert(from, to))
+            return Conflict($"Rollback inválido: {from} -> {to}");
+
+        // Si vienes de NO-bloqueante a bloqueante (Completed -> InProgress), revalidar cupo/duplicado
+        var fromBlocks = AppointmentStatuses.IsBlocking(from);
+        var toBlocks = AppointmentStatuses.IsBlocking(to);
+
+        if (!fromBlocks && toBlocks)
+        {
+            await EnsureGenericAvailabilityAsync(a.ScheduledAt);
+
+            var max = await GetMaxPatientsPerHourAsync(a.ScheduledAt);
+            var booked = await CountBlockingInHourBucket(a.ScheduledAt, exceptId: a.Id);
+            if (booked >= max)
+                return Conflict($"No hay cupo para reactivar la cita. Máximo {max} por hora.");
+
+            if (await HasHourDuplicate(a.PatientId, a.ScheduledAt, exceptId: a.Id))
+                return Conflict("El paciente ya tiene otra cita activa en esa misma hora.");
+        }
+
+        try
+        {
+            ApplyStatusRevert(a, to, GetCurrentUserId(), body.Reason);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
 
         await _db.SaveChangesAsync();
         return Ok(await ReadDto(id));
@@ -818,7 +973,7 @@ public class AppointmentsController : ControllerBase
 
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin,Recepcion")]
-    public async Task<IActionResult> Delete(System.Guid id)
+    public async Task<IActionResult> Delete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
         if (a is null) return NotFound();
