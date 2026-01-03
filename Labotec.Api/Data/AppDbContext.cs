@@ -160,6 +160,9 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(t => t.DefaultPrice)
                 .HasPrecision(18, 2);
 
+            entity.Property(t => t.ReferenceValue)
+                .HasMaxLength(160);
+
             entity.HasIndex(t => t.Code).IsUnique();
         });
 

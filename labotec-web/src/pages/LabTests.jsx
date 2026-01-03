@@ -102,7 +102,7 @@ export default function LabTests() {
       { key: 'code', header: 'Código' },
       { key: 'name', header: 'Nombre' },
       { key: 'defaultUnit', header: 'Unidad' },
-      { key: 'referenceValue', header: 'Valor de referencia', render: row => row.referenceValue ?? row.ReferenceValue ?? '—' },
+      { key: 'referenceValue', header: 'Rango de referencia', render: row => row.referenceValue ?? row.ReferenceValue ?? '—' },
       {
         key: 'defaultPrice',
         header: 'Precio',
@@ -211,7 +211,7 @@ export default function LabTests() {
               </div>
             </div>
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Valor de referencia</label>
+              <label className="block text-xs text-gray-600 mb-1">Rango de referencia</label>
               <input
                 value={formData.referenceValue}
                 onChange={e => setFormData({ ...formData, referenceValue: e.target.value })}
