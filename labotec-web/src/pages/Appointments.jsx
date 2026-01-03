@@ -73,6 +73,7 @@ const getNextStatus = (value) => {
 // ✅ Horas permitidas (sin 12:00 Lun–Vie)
 const WEEKDAY_HOURS = [8, 9, 10, 11, 13, 14, 15, 16] // 08–17, bloquea 12, último turno 16:00
 const SAT_HOURS = [8, 9, 10, 11] // 08–12, último turno 11:00
+const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -83,9 +84,75 @@ function buildDayString(y, m, d) {
   return `${String(y).padStart(4, '0')}-${pad2(m)}-${pad2(d)}`
 }
 
+const getTimeZoneOffsetMinutes = (timeZone, date = new Date()) => {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short',
+    })
+
+    const tzName = dtf.formatToParts(date).find((p) => p.type === 'timeZoneName')?.value
+    const match = tzName?.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/)
+
+    if (match) {
+      const sign = match[1].startsWith('-') ? -1 : 1
+      const hours = Math.abs(parseInt(match[1], 10))
+      const minutes = match[2] ? parseInt(match[2], 10) : 0
+      return sign * (hours * 60 + minutes)
+    }
+  } catch (err) {
+    console.error('No se pudo resolver zona horaria, usando offset fijo -04:00', err)
+  }
+
+  return -4 * 60 // fallback America/Santo_Domingo
+}
+
+const toSantoDomingoParts = (value) => {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SANTO_DOMINGO_TZ,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const parts = formatter.formatToParts(date).reduce((acc, part) => {
+    if (['year', 'month', 'day', 'hour', 'minute'].includes(part.type)) {
+      acc[part.type] = Number(part.value)
+    }
+    return acc
+  }, {})
+
+  if (!['year', 'month', 'day', 'hour'].every((k) => Number.isFinite(parts[k]))) return null
+
+  const dayOfWeek = new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay()
+
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: Number.isFinite(parts.minute) ? parts.minute : 0,
+    dayOfWeek,
+  }
+}
+
 function getTodayDayString() {
-  const now = new Date()
-  return buildDayString(now.getFullYear(), now.getMonth() + 1, now.getDate())
+  const parts = toSantoDomingoParts(new Date())
+  if (!parts) return ''
+  return buildDayString(parts.year, parts.month, parts.day)
 }
 
 function getDowFromDateString(dateStr) {
@@ -114,16 +181,18 @@ function buildLocalDateFromDayHour(dayStr, hour) {
   if (!dayStr || hour == null) return null
   const [y, m, d] = String(dayStr).split('-').map(Number)
   if (![y, m, d].every((x) => Number.isFinite(x))) return null
-  return new Date(y, m - 1, d, Number(hour), 0, 0, 0)
+
+  const utcMs = Date.UTC(y, m - 1, d, Number(hour), 0, 0)
+  const offsetMinutes = getTimeZoneOffsetMinutes(SANTO_DOMINGO_TZ, new Date(utcMs))
+  return new Date(utcMs - offsetMinutes * 60 * 1000)
 }
 
 function extractLocalDayHour(value) {
   if (!value) return { day: '', hour: null }
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return { day: '', hour: null }
-  const day = buildDayString(d.getFullYear(), d.getMonth() + 1, d.getDate())
-  const hour = d.getHours()
-  return { day, hour }
+  const parts = toSantoDomingoParts(value)
+  if (!parts) return { day: '', hour: null }
+  const day = buildDayString(parts.year, parts.month, parts.day)
+  return { day, hour: parts.hour }
 }
 
 function getApiMessage(err, fallback) {
@@ -138,8 +207,8 @@ function formatDate(value) {
     if (!match) return null
     const [_, y, m, d] = match.map(Number)
     if (![y, m, d].every(Number.isFinite)) return null
-    const local = new Date(y, m - 1, d, 12, 0, 0, 0) // mediodía para evitar TZ anteriores
-    return Number.isNaN(local.getTime()) ? null : local
+    const utc = Date.UTC(y, m - 1, d, 12, 0, 0, 0)
+    return new Date(utc)
   }
 
   let dateObj = null
@@ -154,22 +223,31 @@ function formatDate(value) {
     dateObj = d
   }
 
-  return dateObj.toLocaleDateString('es-DO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+  return dateObj.toLocaleDateString('es-DO', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: SANTO_DOMINGO_TZ,
+  })
 }
 
 function formatTime(value) {
   if (!value) return '-'
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return String(value).slice(11, 16)
-  return d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', timeZone: SANTO_DOMINGO_TZ })
 }
 
 // ✅ Reglas de horario + BLOQUEO 12:00 Lun–Vie
 function isWithinBusinessHours(dateObj) {
   if (!dateObj) return { ok: false, reason: 'Fecha/hora inválida.' }
 
-  const dayOfWeek = dateObj.getDay() // 0 dom, 6 sáb
-  const hh = dateObj.getHours()
+  const parts = toSantoDomingoParts(dateObj)
+  if (!parts) return { ok: false, reason: 'Fecha/hora inválida.' }
+
+  const dayOfWeek = parts.dayOfWeek // 0 dom, 6 sáb
+  const hh = parts.hour
 
   // Domingo cerrado
   if (dayOfWeek === 0) return { ok: false, reason: 'Domingo no laborable.' }
@@ -204,9 +282,9 @@ function normalizeDayString(value, fallback = '') {
 function shiftDay(dayStr, delta) {
   const normalized = normalizeDayString(dayStr, getTodayDayString())
   const [y, m, d] = normalized.split('-').map(Number)
-  const base = new Date(y, m - 1, d)
-  base.setDate(base.getDate() + delta)
-  return buildDayString(base.getFullYear(), base.getMonth() + 1, base.getDate())
+  const base = new Date(Date.UTC(y, m - 1, d, 12, 0, 0))
+  base.setUTCDate(base.getUTCDate() + delta)
+  return buildDayString(base.getUTCFullYear(), base.getUTCMonth() + 1, base.getUTCDate())
 }
 
 // ✅ Normaliza citas de API a un formato estable (camelCase)
