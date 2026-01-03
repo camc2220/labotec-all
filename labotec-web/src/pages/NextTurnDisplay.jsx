@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
+import { ACTIVE_QUEUE_STATUSES, normalizeStatus } from '../lib/appointmentStatus'
 
 const REFRESH_INTERVAL_MS = 30000
 
@@ -58,11 +59,17 @@ export default function NextTurnDisplay() {
           params: { page: 1, pageSize: 100, sortDir: 'asc' },
         })
         const appointments = getAppointmentsFromResponse(response)
-        const now = new Date()
-        const upcoming = appointments
-          .map((item) => ({ ...item, parsedDate: parseDate(item.scheduledAt) }))
-          .filter((item) => item.parsedDate && item.parsedDate >= now)
-          .sort((a, b) => a.parsedDate - b.parsedDate)?.[0]
+        const now = Date.now()
+        const candidates = appointments
+          .map((item) => ({
+            ...item,
+            parsedDate: parseDate(item.scheduledAt),
+            normalizedStatus: normalizeStatus(item.status) || 'Scheduled',
+          }))
+          .filter((item) => item.parsedDate && ACTIVE_QUEUE_STATUSES.has(item.normalizedStatus))
+          .sort((a, b) => a.parsedDate - b.parsedDate)
+
+        const upcoming = candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
 
         if (!cancelled) {
           setNextAppointment(upcoming ?? null)

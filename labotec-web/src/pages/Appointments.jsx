@@ -5,6 +5,7 @@ import Modal from '../components/Modal'
 import { resolveEntityId } from '../lib/entity'
 import { useAuth } from '../context/AuthContext'
 import PatientSelect from '../components/PatientSelect'
+import { ACTIVE_QUEUE_STATUSES, STATUS_FLOW, getNextStatus, normalizeStatus } from '../lib/appointmentStatus'
 
 const baseTypeOptions = [
   'Perfil completo de laboratorio',
@@ -31,44 +32,6 @@ const baseStatusOptions = [
   'Rutinario',
   'Normal',
 ]
-
-const statusAlias = {
-  scheduled: 'Scheduled',
-  pendiente: 'Scheduled',
-  confirmed: 'Scheduled',
-  confirmada: 'Scheduled',
-  checkin: 'CheckedIn',
-  'check-in': 'CheckedIn',
-  checkedin: 'CheckedIn',
-  enprogreso: 'InProgress',
-  inprogress: 'InProgress',
-  atendiendo: 'InProgress',
-  atendida: 'Completed',
-  completed: 'Completed',
-  completada: 'Completed',
-  cancelada: 'Canceled',
-  cancelled: 'Canceled',
-  canceled: 'Canceled',
-  noshow: 'NoShow',
-  'no_show': 'NoShow',
-}
-
-const STATUS_FLOW = ['Scheduled', 'CheckedIn', 'InProgress', 'Completed']
-const ACTIVE_QUEUE_STATUSES = new Set(['Scheduled', 'CheckedIn', 'InProgress'])
-
-const normalizeStatus = (value) => {
-  if (!value) return ''
-  const key = String(value).replace(/\s+/g, '').toLowerCase()
-  return statusAlias[key] ?? value
-}
-
-const getNextStatus = (value) => {
-  const current = normalizeStatus(value) || 'Scheduled'
-  const idx = STATUS_FLOW.indexOf(current)
-  if (idx === -1) return STATUS_FLOW[0]
-  if (idx >= STATUS_FLOW.length - 1) return STATUS_FLOW[idx]
-  return STATUS_FLOW[idx + 1]
-}
 
 // ✅ Horas permitidas (sin 12:00 Lun–Vie)
 const WEEKDAY_HOURS = [8, 9, 10, 11, 13, 14, 15, 16] // 08–17, bloquea 12, último turno 16:00
