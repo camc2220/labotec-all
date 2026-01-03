@@ -78,6 +78,16 @@ function pad2(n) {
   return String(n).padStart(2, '0')
 }
 
+function buildDayString(y, m, d) {
+  if (![y, m, d].every((x) => Number.isFinite(x))) return ''
+  return `${String(y).padStart(4, '0')}-${pad2(m)}-${pad2(d)}`
+}
+
+function getTodayDayString() {
+  const now = new Date()
+  return buildDayString(now.getFullYear(), now.getMonth() + 1, now.getDate())
+}
+
 function getDowFromDateString(dateStr) {
   // dateStr: "YYYY-MM-DD"
   const [y, m, d] = String(dateStr).split('-').map(Number)
@@ -111,7 +121,7 @@ function extractLocalDayHour(value) {
   if (!value) return { day: '', hour: null }
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return { day: '', hour: null }
-  const day = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+  const day = buildDayString(d.getFullYear(), d.getMonth() + 1, d.getDate())
   const hour = d.getHours()
   return { day, hour }
 }
@@ -162,6 +172,21 @@ function isSameLocalDay(a, b) {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   )
+}
+
+function normalizeDayString(value, fallback = '') {
+  if (!value) return fallback
+  const [y, m, d] = String(value).split('-').map(Number)
+  if (![y, m, d].every((x) => Number.isFinite(x))) return fallback
+  return buildDayString(y, m, d)
+}
+
+function shiftDay(dayStr, delta) {
+  const normalized = normalizeDayString(dayStr, getTodayDayString())
+  const [y, m, d] = normalized.split('-').map(Number)
+  const base = new Date(y, m - 1, d)
+  base.setDate(base.getDate() + delta)
+  return buildDayString(base.getFullYear(), base.getMonth() + 1, base.getDate())
 }
 
 // ✅ Normaliza citas de API a un formato estable (camelCase)
@@ -290,10 +315,22 @@ export default function Appointments() {
   const [statusSavingId, setStatusSavingId] = useState(null)
   const [statusError, setStatusError] = useState('')
 
+  const [selectedDay, setSelectedDay] = useState(() => getTodayDayString())
+
+  const appointmentsForSelectedDay = useMemo(() => {
+    const normalizedDay = normalizeDayString(selectedDay, '')
+    if (!normalizedDay) return items
+
+    return items.filter((it) => {
+      const { day } = extractLocalDayHour(it.scheduledAt)
+      return day === normalizedDay
+    })
+  }, [items, selectedDay])
+
   const nextAppointment = useMemo(() => {
     if (!canManageAppointments) return null
 
-    const candidates = items
+    const candidates = appointmentsForSelectedDay
       .map((it) => {
         const parsed = new Date(it.scheduledAt)
         return {
@@ -311,7 +348,7 @@ export default function Appointments() {
     const future = candidates.find((it) => it._date.getTime() >= now)
     const pick = future || candidates[0]
     return { ...pick, status: normalizeStatus(pick.status) || pick.status }
-  }, [canManageAppointments, items])
+  }, [appointmentsForSelectedDay, canManageAppointments])
 
   // ✅ Nuevo: guardamos DÍA + HORA (sin minutos)
   const [formData, setFormData] = useState({
@@ -820,15 +857,53 @@ export default function Appointments() {
         </div>
 
         <div className="mt-4 space-y-3">
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDay((prev) => shiftDay(prev, -1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Día anterior
+              </button>
+              <input
+                type="date"
+                value={normalizeDayString(selectedDay, '')}
+                onChange={(e) => setSelectedDay(normalizeDayString(e.target.value, getTodayDayString()))}
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              />
+              <button
+                type="button"
+                onClick={() => setSelectedDay((prev) => shiftDay(prev, 1))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Siguiente día
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDay(getTodayDayString())}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Hoy
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600">
+              Mostrando citas del <span className="font-semibold text-gray-900">{formatDate(selectedDay)}</span>.
+            </p>
+          </div>
+
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {statusError && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">{statusError}</div>}
 
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : items.length > 0 ? (
-            <Table columns={appointmentColumns} data={items} />
+          ) : appointmentsForSelectedDay.length > 0 ? (
+            <Table columns={appointmentColumns} data={appointmentsForSelectedDay} />
           ) : (
-            <div className="text-sm text-gray-500">{isPatient ? 'Aún no tienes citas programadas.' : 'No hay citas registradas.'}</div>
+            <div className="text-sm text-gray-500">
+              {isPatient ? 'No tienes citas para este día.' : 'No hay citas registradas para este día.'}
+            </div>
           )}
         </div>
       </div>
@@ -1110,4 +1185,3 @@ export default function Appointments() {
     </section>
   )
 }
-
