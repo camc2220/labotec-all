@@ -2,10 +2,12 @@
 namespace Labotec.Api.DTOs;
 
 public record AppointmentAvailabilityDto(
-    System.Guid Id,
+    System.Guid? Id,
     string Day,
     string Time,
-    int Slots
+    int Slots,
+    int AvailableSlots,
+    bool IsCustom
 );
 
 public record AppointmentAvailabilityUpsertDto(

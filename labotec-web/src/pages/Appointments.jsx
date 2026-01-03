@@ -229,19 +229,32 @@ function normalizeAvailability(raw, defaultSlotsPerHour) {
     time = `${pad2(Number(hh))}:00`
   }
 
+  const id = resolveEntityId(raw)
+
+  const toNumber = (value) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
+  }
+
+  const capacity =
+    toNumber(raw?.slots ?? raw?.Slots ?? raw?.capacity ?? raw?.Capacity) ??
+    defaultSlotsPerHour
+
+  const availableSlots =
+    toNumber(raw?.availableSlots ?? raw?.AvailableSlots ?? raw?.remaining ?? raw?.Remaining ?? raw?.available ?? raw?.Available) ??
+    capacity
+
+  const isCustomFlag = raw?.isCustom ?? raw?.IsCustom
+  const isCustom = typeof isCustomFlag === 'boolean' ? isCustomFlag : Boolean(id)
+
   return {
-    id: resolveEntityId(raw),
+    id,
     day,
     time,
-    slots: Number(
-      raw?.slots ??
-      raw?.Slots ??
-      raw?.availableSlots ??
-      raw?.AvailableSlots ??
-      raw?.capacity ??
-      raw?.Capacity ??
-      defaultSlotsPerHour
-    ),
+    slots: capacity,
+    capacity,
+    availableSlots,
+    isCustom,
   }
 }
 
@@ -414,25 +427,49 @@ export default function Appointments() {
     setEditingItem(null)
   }
 
-  const getCapacityForSlot = (day, hourStr) => {
-    if (!day || !hourStr) return defaultSlotsPerHour
-    const slot = availability.find((entry) => entry.day === day && entry.time === hourStr)
-    const n = slot?.slots
-    return Number.isFinite(n) ? n : defaultSlotsPerHour
+  const parseNumber = (value) => {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : null
   }
 
-  const getBookedCount = (day, hourStr, excludeId) => {
-    return items.filter((it) => {
-      if (excludeId && it.id === excludeId) return false
-      const d = new Date(it.scheduledAt)
-      if (Number.isNaN(d.getTime())) return false
-      const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-      const itHour = `${pad2(d.getHours())}:00`
-      return itDay === day && itHour === hourStr
-    }).length
+  const findAvailabilitySlot = (day, hourStr) => {
+    if (!day || !hourStr) return null
+    return availability.find((entry) => entry.day === day && entry.time === hourStr) || null
   }
+
+  const getCapacityForSlot = (day, hourStr) => {
+    const slot = findAvailabilitySlot(day, hourStr)
+    const n = slot?.capacity ?? slot?.slots ?? slot?.availableSlots
+    return parseNumber(n) ?? defaultSlotsPerHour
+  }
+
+  const matchesDayAndHour = (scheduledAt, day, hourStr) => {
+    const d = new Date(scheduledAt)
+    if (Number.isNaN(d.getTime())) return false
+    const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const itHour = `${pad2(d.getHours())}:00`
+    return itDay === day && itHour === hourStr
+  }
+
+  const getBookedCount = (day, hourStr, excludeId) =>
+    items.filter((it) => {
+      if (excludeId && it.id === excludeId) return false
+      return matchesDayAndHour(it.scheduledAt, day, hourStr)
+    }).length
 
   const getRemainingSlots = (day, hourStr, excludeId) => {
+    const slot = findAvailabilitySlot(day, hourStr)
+    if (slot) {
+      const fromApi = parseNumber(slot.availableSlots)
+      if (fromApi != null) {
+        let remaining = fromApi
+        if (excludeId && items.some((it) => it.id === excludeId && matchesDayAndHour(it.scheduledAt, day, hourStr))) {
+          remaining += 1
+        }
+        return Math.max(remaining, 0)
+      }
+    }
+
     const cap = getCapacityForSlot(day, hourStr)
     const booked = getBookedCount(day, hourStr, excludeId)
     return Math.max(cap - booked, 0)
@@ -622,7 +659,7 @@ export default function Appointments() {
       id: slot.id,
       day: slot.day || '',
       time: slot.time || '',
-      slots: Number(slot.slots) || defaultSlotsPerHour,
+      slots: Number(slot.capacity ?? slot.slots) || defaultSlotsPerHour,
     })
   }
 
@@ -893,7 +930,26 @@ export default function Appointments() {
                 columns={[
                   { key: 'day', header: 'Día', render: (row) => formatDate(row.day) },
                   { key: 'time', header: 'Hora', render: (row) => row.time || '-' },
-                  { key: 'slots', header: 'Citas disponibles', render: (row) => Number.isFinite(row.slots) ? row.slots : defaultSlotsPerHour },
+                  {
+                    key: 'availableSlots',
+                    header: 'Citas disponibles',
+                    render: (row) => {
+                      const available = parseNumber(row.availableSlots)
+                      const capacity = parseNumber(row.capacity ?? row.slots)
+                      if (available != null && capacity != null) return `${available} / ${capacity}`
+                      return available ?? capacity ?? defaultSlotsPerHour
+                    },
+                  },
+                  {
+                    key: 'capacity',
+                    header: 'Cupo base',
+                    render: (row) => parseNumber(row.capacity ?? row.slots) ?? defaultSlotsPerHour,
+                  },
+                  {
+                    key: 'isCustom',
+                    header: 'Tipo',
+                    render: (row) => (row.isCustom ? 'Personalizada' : 'Genérica'),
+                  },
                   {
                     key: 'actions',
                     header: 'Acciones',
@@ -1054,9 +1110,4 @@ export default function Appointments() {
     </section>
   )
 }
-
-
-
-
-
 

@@ -416,6 +416,9 @@ public class AppointmentsController : ControllerBase
            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub)
            ?? string.Empty;
 
+    private Task<int> GetDefaultMaxPatientsAsync()
+        => AppointmentAvailabilityHelper.GetDefaultCapacityAsync(_db);
+
     private static bool TryValidateExactHour(DateTime utc, out string error)
     {
         if (utc.Minute != 0 || utc.Second != 0 || utc.Millisecond != 0)
@@ -433,18 +436,19 @@ public class AppointmentsController : ControllerBase
     {
         var slot = await _db.AppointmentAvailabilities.AsNoTracking()
             .Where(x => x.StartUtc == bucketStartUtc)
-            .Select(x => x.Slots)
+            .Select(x => (int?)x.Slots)
             .FirstOrDefaultAsync();
 
-        if (slot >= 0) // 0 es válido (bloquea)
-            return slot;
+        if (slot.HasValue) // 0 es válido (bloquea)
+            return slot.Value;
 
-        var max = await _db.SchedulingSettings.AsNoTracking()
-            .Where(x => x.Id == 1)
-            .Select(x => x.MaxPatientsPerHour)
-            .FirstOrDefaultAsync();
+        return await GetDefaultMaxPatientsAsync();
+    }
 
-        return max > 0 ? max : 10;
+    private async Task EnsureGenericAvailabilityAsync(DateTime bucketStartUtc)
+    {
+        var defaultCapacity = await GetDefaultMaxPatientsAsync();
+        await AppointmentAvailabilityHelper.EnsureGenericAvailabilityAsync(_db, bucketStartUtc, defaultCapacity);
     }
 
     private async Task<int> CountBlockingInHourBucket(DateTime scheduledAtBucketUtc, System.Guid? exceptId = null)
@@ -651,6 +655,8 @@ public class AppointmentsController : ControllerBase
         if (await HasHourDuplicate(dto.PatientId, scheduledAtUtc))
             return Conflict("Ya existe una cita para este paciente en esa misma hora.");
 
+        await EnsureGenericAvailabilityAsync(scheduledAtUtc);
+
         var entity = new Domain.Appointment
         {
             PatientId = dto.PatientId,
@@ -719,6 +725,8 @@ public class AppointmentsController : ControllerBase
             if (await HasHourDuplicate(a.PatientId, scheduledAtUtc, exceptId: a.Id))
                 return Conflict("Ya existe una cita para este paciente en esa misma hora.");
         }
+
+        await EnsureGenericAvailabilityAsync(scheduledAtUtc);
 
         try
         {

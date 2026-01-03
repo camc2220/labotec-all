@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,6 +21,16 @@ public class AppointmentAvailabilityController : ControllerBase
 {
     private readonly AppDbContext _db;
     public AppointmentAvailabilityController(AppDbContext db) => _db = db;
+
+    private async Task<int> CountBlockingInHourBucket(DateTime bucketStartUtc)
+    {
+        var (startUtc, endUtc) = SchedulingRules.GetLocalHourBucketUtcRange(bucketStartUtc);
+
+        return await _db.Appointments.AsNoTracking()
+            .Where(a => a.ScheduledAt >= startUtc && a.ScheduledAt < endUtc)
+            .Where(a => AppointmentStatuses.BlockingForQuery.Contains(a.Status))
+            .CountAsync();
+    }
 
     private static bool TryParseLocalDayTime(string day, string time, out DateTime localDt, out string error)
     {
@@ -51,13 +62,47 @@ public class AppointmentAvailabilityController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult> GetAll()
+    public async Task<ActionResult> GetAll([FromQuery] int days = 30)
     {
-        var list = await _db.AppointmentAvailabilities
+        var rangeDays = days <= 0 ? 30 : Math.Min(days, 90);
+        var defaultCapacity = await AppointmentAvailabilityHelper.GetDefaultCapacityAsync(_db);
+
+        var customSlots = await _db.AppointmentAvailabilities
             .AsNoTracking()
-            .OrderBy(x => x.Day).ThenBy(x => x.Time)
-            .Select(x => new AppointmentAvailabilityDto(x.Id, x.Day, x.Time, x.Slots))
             .ToListAsync();
+
+        var todayLocal = SchedulingRules.ToLocal(DateTime.UtcNow).Date;
+        var bucketSet = new HashSet<DateTime>(AppointmentAvailabilityHelper.BuildWorkingHourBuckets(todayLocal, rangeDays));
+
+        foreach (var slot in customSlots)
+            bucketSet.Add(slot.StartUtc);
+
+        if (bucketSet.Count == 0)
+            return Ok(Array.Empty<AppointmentAvailabilityDto>());
+
+        var buckets = bucketSet.OrderBy(x => x).ToList();
+        var customMap = customSlots.ToDictionary(x => x.StartUtc, x => x);
+
+        var bookedByBucket = await AppointmentAvailabilityHelper.CountBookedByBucketAsync(
+            _db,
+            buckets.First(),
+            buckets.Last().AddHours(1));
+
+        var list = buckets.Select(startUtc =>
+        {
+            var capacity = customMap.TryGetValue(startUtc, out var slot) ? slot.Slots : defaultCapacity;
+            var booked = bookedByBucket.TryGetValue(startUtc, out var count) ? count : 0;
+            var (day, time) = AppointmentAvailabilityHelper.ToLocalStrings(startUtc);
+
+            return new AppointmentAvailabilityDto(
+                customMap.TryGetValue(startUtc, out var current) ? current.Id : null,
+                day,
+                time,
+                capacity,
+                Math.Max(capacity - booked, 0),
+                customMap.ContainsKey(startUtc)
+            );
+        }).ToList();
 
         return Ok(list);
     }
@@ -103,7 +148,15 @@ public class AppointmentAvailabilityController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(new AppointmentAvailabilityDto(entity.Id, entity.Day, entity.Time, entity.Slots));
+        var booked = await CountBlockingInHourBucket(bucketStartUtc);
+
+        return Ok(new AppointmentAvailabilityDto(
+            entity.Id,
+            entity.Day,
+            entity.Time,
+            entity.Slots,
+            Math.Max(entity.Slots - booked, 0),
+            true));
     }
 
     [HttpPut("{id:guid}")]
