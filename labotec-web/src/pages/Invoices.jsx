@@ -51,6 +51,7 @@ export default function Invoices() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([])
   const [updatingPaidId, setUpdatingPaidId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [resultLimit, setResultLimit] = useState('10')
 
   const isPatient = user?.role === 'patient'
   const canManage = user?.isAdmin || user?.isFacturacion
@@ -257,6 +258,13 @@ export default function Invoices() {
       return values.some(value => value && value.toString().toLowerCase().includes(term))
     })
   }, [items, searchTerm])
+
+  const visibleItems = useMemo(() => {
+    if (resultLimit === 'all') return filteredItems
+    const limitNumber = Number(resultLimit)
+    if (Number.isNaN(limitNumber) || limitNumber <= 0) return filteredItems
+    return filteredItems.slice(0, limitNumber)
+  }, [filteredItems, resultLimit])
 
   const selectedLabTestIds = useMemo(
     () => new Set((formData.items ?? []).map(item => item.labTestId)),
@@ -525,14 +533,32 @@ export default function Invoices() {
             placeholder="Número, paciente o prueba"
             className="w-full max-w-sm rounded-lg border px-3 py-2 text-sm"
           />
+          <label className="text-sm text-gray-700" htmlFor="invoice-limit">Mostrar</label>
+          <select
+            id="invoice-limit"
+            value={resultLimit}
+            onChange={e => setResultLimit(e.target.value)}
+            className="rounded-lg border px-3 py-2 text-sm"
+          >
+            <option value="10">Últimas 10</option>
+            <option value="20">Últimas 20</option>
+            <option value="50">Últimas 50</option>
+            <option value="all">Todas</option>
+          </select>
         </div>
 
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : filteredItems.length > 0 ? (
-            <Table columns={columns} data={filteredItems} />
+          ) : visibleItems.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <span>Mostrando {visibleItems.length} de {filteredItems.length} resultados</span>
+                {resultLimit !== 'all' && filteredItems.length > visibleItems.length && <span>Usa "Todas" para ver todos los resultados</span>}
+              </div>
+              <Table columns={columns} data={visibleItems} />
+            </>
           ) : (
             <div className="text-sm text-gray-500">
               {isPatient
