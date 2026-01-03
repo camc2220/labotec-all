@@ -14,12 +14,21 @@ import PatientDashboard from './pages/PatientDashboard'
 import AppIndexRedirect from './components/AppIndexRedirect'
 import UserManagement from './pages/UserManagement'
 import Profile from './pages/Profile'
+import NextTurnDisplay from './pages/NextTurnDisplay'
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route index element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/app/next-turn-display"
+          element={(
+            <PrivateRoute>
+              <NextTurnDisplay />
+            </PrivateRoute>
+          )}
+        />
         <Route
           path="/app"
           element={(

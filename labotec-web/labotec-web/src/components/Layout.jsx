@@ -4,24 +4,32 @@ import { useAuth } from '../context/AuthContext'
 
 function getRoleLabel(user) {
   if (!user) return ''
-  if (user.isAdmin) return 'Administrador'
-  if (user.isRecepcion) return 'Recepción'
-  if (user.isFacturacion) return 'Facturación'
-  if (user.isBioanalista) return 'Bioanalista'
+  if (user.isAdmin || user.role === 'admin') return 'Administrador'
+  if (user.isRecepcion || user.role === 'recepcion') return 'Recepción'
+  if (user.isFacturacion || user.role === 'facturacion') return 'Facturación'
+  if (user.isBioanalista || user.role === 'bioanalista') return 'Bioanalista'
   return 'Paciente'
 }
 
 export default function Layout() {
   const { user, logout } = useAuth()
 
+  const isAdmin = user?.isAdmin || user?.role === 'admin'
+  const isRecepcion = user?.isRecepcion || user?.role === 'recepcion'
+  const isFacturacion = user?.isFacturacion || user?.role === 'facturacion'
+  const isBioanalista = user?.isBioanalista || user?.role === 'bioanalista'
+
+  const canProjectTurn = isAdmin || isRecepcion || isFacturacion || isBioanalista
+
   const navigation = useMemo(() => {
     if (!user) return []
 
-    if (user.isAdmin) {
+    if (isAdmin) {
       return [
         { to: '/app/users', label: 'Usuarios' },
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/results', label: 'Resultados' },
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
@@ -29,26 +37,29 @@ export default function Layout() {
       ]
     }
 
-    if (user.isRecepcion) {
+    if (isRecepcion) {
       return [
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
     }
 
-    if (user.isFacturacion) {
+    if (isFacturacion) {
       return [
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
     }
 
-    if (user.isBioanalista) {
+    if (isBioanalista) {
       return [
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/results', label: 'Resultados' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
@@ -97,6 +108,15 @@ export default function Layout() {
             ))}
           </nav>
           <div className="flex items-center gap-3 text-right">
+            {canProjectTurn && (
+              <button
+                type="button"
+                onClick={() => window.open('/app/next-turn-display', '_blank', 'noopener,noreferrer')}
+                className="inline-flex rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:border-white/60 hover:bg-white/20"
+              >
+                Proyectar turno
+              </button>
+            )}
             <div className="leading-tight text-xs text-white/80">
               <p className="text-sm font-semibold text-white">{user.name}</p>
               <p className="capitalize">{roleLabel}</p>
