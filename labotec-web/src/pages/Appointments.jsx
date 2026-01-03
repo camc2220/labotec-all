@@ -75,6 +75,26 @@ const WEEKDAY_HOURS = [8, 9, 10, 11, 13, 14, 15, 16] // 08–17, bloquea 12, úl
 const SAT_HOURS = [8, 9, 10, 11] // 08–12, último turno 11:00
 const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
+function parseDateValue(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  const str = String(value ?? '').trim()
+  if (!str) return null
+
+  const hasTimezone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(str)
+  const isoNoTz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/
+
+  if (!hasTimezone && isoNoTz.test(str)) {
+    const asUtc = new Date(`${str}Z`)
+    if (!Number.isNaN(asUtc.getTime())) return asUtc
+  }
+
+  const parsed = new Date(str)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0')
 }
@@ -115,8 +135,8 @@ const getTimeZoneOffsetMinutes = (timeZone, date = new Date()) => {
 }
 
 const toSantoDomingoParts = (value) => {
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return null
+  const date = parseDateValue(value)
+  if (!date) return null
 
   const formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: SANTO_DOMINGO_TZ,
@@ -225,9 +245,9 @@ function formatDate(value) {
   }
 
   if (!dateObj) {
-    const d = new Date(value)
-    if (Number.isNaN(d.getTime())) return String(value).slice(0, 10)
-    dateObj = d
+    const parsed = parseDateValue(value)
+    if (!parsed) return String(value).slice(0, 10)
+    dateObj = parsed
   }
 
   return dateObj.toLocaleDateString('es-DO', {
@@ -241,8 +261,8 @@ function formatDate(value) {
 
 function formatTime(value) {
   if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value).slice(11, 16)
+  const d = parseDateValue(value)
+  if (!d) return String(value).slice(11, 16)
   return d.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', timeZone: SANTO_DOMINGO_TZ })
 }
 
@@ -352,8 +372,8 @@ function normalizeAvailability(raw, defaultSlotsPerHour) {
   let time = ''
   const str = String(timeRaw || '')
   if (str.includes('T')) {
-    const d = new Date(str)
-    if (!Number.isNaN(d.getTime())) time = `${pad2(d.getHours())}:00`
+    const d = parseDateValue(str)
+    if (d) time = `${pad2(d.getHours())}:00`
   } else if (str) {
     const [hh] = str.split(':')
     time = `${pad2(Number(hh))}:00`
@@ -443,10 +463,10 @@ export default function Appointments() {
 
     const candidates = appointmentsForSelectedDay
       .map((it) => {
-        const parsed = new Date(it.scheduledAt)
+        const parsed = parseDateValue(it.scheduledAt)
         return {
           ...it,
-          _date: Number.isNaN(parsed.getTime()) ? null : parsed,
+          _date: parsed,
           status: normalizeStatus(it.status) || it.status,
         }
       })
@@ -592,9 +612,11 @@ export default function Appointments() {
   }
 
   const matchesDayAndHour = (scheduledAt, day, hourStr) => {
-    const { day: slotDay, hour } = extractLocalDayHour(scheduledAt)
-    if (!slotDay || hour == null) return false
-    return slotDay === day && `${pad2(hour)}:00` === hourStr
+    const d = parseDateValue(scheduledAt)
+    if (!d) return false
+    const itDay = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const itHour = `${pad2(d.getHours())}:00`
+    return itDay === day && itHour === hourStr
   }
 
   const getBookedCount = (day, hourStr, excludeId) =>
