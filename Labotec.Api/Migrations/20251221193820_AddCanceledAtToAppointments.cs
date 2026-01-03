@@ -11,12 +11,6 @@ namespace Labotec.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterTable(
-                name: "InvoiceItems")
-                .Annotation("MySql:CharSet", "utf8mb4")
-                .OldAnnotation("MySql:CharSet", "utf8mb4")
-                .OldAnnotation("Relational:Collation", "ascii_general_ci");
-
             migrationBuilder.AlterColumn<string>(
                 name: "Notes",
                 table: "Appointments",
@@ -196,12 +190,6 @@ namespace Labotec.Api.Migrations
             migrationBuilder.DropColumn(
                 name: "StartedByUserId",
                 table: "Appointments");
-
-            migrationBuilder.AlterTable(
-                name: "InvoiceItems")
-                .Annotation("MySql:CharSet", "utf8mb4")
-                .Annotation("Relational:Collation", "ascii_general_ci")
-                .OldAnnotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.AlterColumn<string>(
                 name: "Notes",
