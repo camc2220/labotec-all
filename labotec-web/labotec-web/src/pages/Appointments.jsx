@@ -112,6 +112,11 @@ export default function Appointments() {
     setEditingItem(null)
   }
 
+  const openProjectionTab = () => {
+    const url = `${window.location.origin}/app/next-turn-display`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   const handleFormSubmit = async e => {
     e.preventDefault()
     if (!canEditAppointments) return
@@ -364,14 +369,25 @@ export default function Appointments() {
             <h3 className="text-lg font-semibold text-gray-900">{isPatient ? 'Historial de citas' : 'Calendario de atención'}</h3>
             <p className="text-sm text-gray-600">{calendarSubtitle}</p>
           </div>
-          {canEditAppointments && (
-            <button
-              onClick={() => openForm(null)}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-            >
-              {isPatient ? 'Agendar cita' : 'Agregar cita'}
-            </button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {!isPatient && (
+              <button
+                type="button"
+                onClick={openProjectionTab}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-50 hover:text-sky-700"
+              >
+                Proyectar próximo turno
+              </button>
+            )}
+            {canEditAppointments && (
+              <button
+                onClick={() => openForm(null)}
+                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                {isPatient ? 'Agendar cita' : 'Agregar cita'}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 space-y-3">
