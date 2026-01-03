@@ -327,6 +327,12 @@ export default function Appointments() {
     })
   }, [items, selectedDay])
 
+  const availabilityForSelectedDay = useMemo(() => {
+    const normalizedDay = normalizeDayString(selectedDay, '')
+    if (!normalizedDay) return availability
+    return availability.filter((slot) => normalizeDayString(slot.day, '') === normalizedDay)
+  }, [availability, selectedDay])
+
   const nextAppointment = useMemo(() => {
     if (!canManageAppointments) return null
 
@@ -914,6 +920,9 @@ export default function Appointments() {
           <p className="text-sm text-gray-600">
             Ajusta los cupos disponibles por franja horaria (por hora exacta, sin minutos).
           </p>
+          <p className="mt-1 text-xs text-gray-500">
+            Mostrando disponibilidad del <span className="font-semibold text-gray-900">{formatDate(selectedDay)}</span>.
+          </p>
 
           <form onSubmit={handleAvailabilitySubmit} className="mt-4 grid gap-4 md:grid-cols-4">
             <div>
@@ -1000,7 +1009,7 @@ export default function Appointments() {
             {availabilityError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{availabilityError}</div>}
             {availabilityLoading ? (
               <div className="text-sm text-gray-600">Cargando disponibilidad...</div>
-            ) : availability.length > 0 ? (
+            ) : availabilityForSelectedDay.length > 0 ? (
               <Table
                 columns={[
                   { key: 'day', header: 'Día', render: (row) => formatDate(row.day) },
@@ -1035,10 +1044,10 @@ export default function Appointments() {
                     ),
                   },
                 ]}
-                data={availability}
+                data={availabilityForSelectedDay}
               />
             ) : (
-              <div className="text-sm text-gray-500">Agrega cupos para comenzar a gestionar la disponibilidad.</div>
+              <div className="text-sm text-gray-500">No hay cupos configurados para este día.</div>
             )}
           </div>
         </div>
