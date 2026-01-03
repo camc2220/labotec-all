@@ -22,6 +22,7 @@ export default function Layout() {
         { to: '/app/users', label: 'Usuarios' },
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/results', label: 'Resultados' },
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
@@ -32,6 +33,7 @@ export default function Layout() {
     if (user.isRecepcion) {
       return [
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
@@ -41,6 +43,7 @@ export default function Layout() {
       return [
         { to: '/app/lab-tests', label: 'Pruebas' },
         { to: '/app/invoices', label: 'Facturas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
     }
@@ -49,6 +52,7 @@ export default function Layout() {
       return [
         { to: '/app/patients', label: 'Pacientes' },
         { to: '/app/appointments', label: 'Citas' },
+        { to: '/app/next-turn-display', label: 'Próximo turno' },
         { to: '/app/results', label: 'Resultados' },
         { to: '/app/profile', label: 'Mi perfil' },
       ]
