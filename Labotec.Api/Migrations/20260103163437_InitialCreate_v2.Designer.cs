@@ -4,6 +4,7 @@ using Labotec.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Labotec.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260103163437_InitialCreate_v2")]
+    partial class InitialCreate_v2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -28,14 +31,50 @@ namespace Labotec.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("char(36)");
 
+                    b.Property<DateTime?>("CanceledAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CanceledByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("CheckedInAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CheckedInByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CompletedByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("NoShowAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("NoShowByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
                     b.Property<string>("Notes")
-                        .HasColumnType("longtext");
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
 
                     b.Property<Guid>("PatientId")
                         .HasColumnType("char(36)");
 
                     b.Property<DateTime>("ScheduledAt")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("StartedByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -53,7 +92,79 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("ScheduledAt");
 
+                    b.HasIndex("Status");
+
                     b.ToTable("Appointments", (string)null);
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.AppointmentAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<string>("Day")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<int>("Slots")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Time")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("varchar(5)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartUtc")
+                        .IsUnique();
+
+                    b.ToTable("AppointmentAvailabilities", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AppointmentAvailabilities_Slots_NonNegative", "Slots >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.AvailabilitySlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<int>("Capacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartUtc")
+                        .IsUnique();
+
+                    b.ToTable("AvailabilitySlots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_AvailabilitySlots_Capacity_NonNegative", "Capacity >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.Invoice", b =>
@@ -63,7 +174,8 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(65,30)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("IssuedAt")
                         .HasColumnType("datetime(6)");
@@ -86,25 +198,23 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("Invoices", (string)null);
+                    b.ToTable("Invoices");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.InvoiceItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("char(36)")
-                        .UseCollation("ascii_general_ci");
+                        .HasColumnType("char(36)");
 
                     b.Property<Guid>("InvoiceId")
-                        .HasColumnType("char(36)")
-                        .UseCollation("ascii_general_ci");
+                        .HasColumnType("char(36)");
 
                     b.Property<Guid>("LabTestId")
-                        .HasColumnType("char(36)")
-                        .UseCollation("ascii_general_ci");
+                        .HasColumnType("char(36)");
 
                     b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("Id");
@@ -117,9 +227,6 @@ namespace Labotec.Api.Migrations
                         {
                             t.HasCheckConstraint("CK_InvoiceItems_Price_NonNegative", "Price >= 0");
                         });
-
-                    MySqlEntityTypeBuilderExtensions.HasCharSet(b, "utf8mb4");
-                    MySqlEntityTypeBuilderExtensions.UseCollation(b, "ascii_general_ci");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabOrder", b =>
@@ -149,7 +256,7 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("LabOrders", (string)null);
+                    b.ToTable("LabOrders");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabOrderItem", b =>
@@ -165,7 +272,8 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("char(36)");
 
                     b.Property<decimal?>("Price")
-                        .HasColumnType("decimal(65,30)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -178,7 +286,10 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("LabTestId");
 
-                    b.ToTable("LabOrderItems", (string)null);
+                    b.ToTable("LabOrderItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LabOrderItems_Price_NonNegative", "Price >= 0");
+                        });
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabResult", b =>
@@ -219,7 +330,7 @@ namespace Labotec.Api.Migrations
 
                     b.HasIndex("PatientId");
 
-                    b.ToTable("LabResults", (string)null);
+                    b.ToTable("LabResults");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.LabTest", b =>
@@ -237,7 +348,8 @@ namespace Labotec.Api.Migrations
                         .HasColumnType("varchar(30)");
 
                     b.Property<decimal?>("DefaultPrice")
-                        .HasColumnType("decimal(65,30)");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("DefaultUnit")
                         .HasMaxLength(40)
@@ -257,7 +369,56 @@ namespace Labotec.Api.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("LabTests", (string)null);
+                    b.ToTable("LabTests");
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.LabTestReferenceRange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int?>("AgeMaxYears")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("AgeMinYears")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("LabTestId")
+                        .HasColumnType("char(36)");
+
+                    b.Property<decimal?>("MaxValue")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<decimal?>("MinValue")
+                        .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<string>("Sex")
+                        .HasMaxLength(1)
+                        .HasColumnType("varchar(1)");
+
+                    b.Property<string>("TextRange")
+                        .HasMaxLength(160)
+                        .HasColumnType("varchar(160)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(40)
+                        .HasColumnType("varchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LabTestId");
+
+                    b.HasIndex("LabTestId", "Sex", "AgeMinYears", "AgeMaxYears");
+
+                    b.ToTable("LabTestReferenceRanges");
                 });
 
             modelBuilder.Entity("Labotec.Api.Domain.Patient", b =>
@@ -297,7 +458,31 @@ namespace Labotec.Api.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Patients", (string)null);
+                    b.ToTable("Patients");
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.SchedulingSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("MaxPatientsPerHour")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(10);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SchedulingSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SchedulingSettings_MaxPatientsPerHour_Positive", "MaxPatientsPerHour > 0");
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -576,6 +761,17 @@ namespace Labotec.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("Labotec.Api.Domain.LabTestReferenceRange", b =>
+                {
+                    b.HasOne("Labotec.Api.Domain.LabTest", "LabTest")
+                        .WithMany()
+                        .HasForeignKey("LabTestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("LabTest");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
