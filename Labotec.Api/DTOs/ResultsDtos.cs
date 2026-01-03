@@ -18,6 +18,7 @@ public record LabResultReadDto(
     string TestName,
     string ResultValue,
     string Unit,
+    string CreatedByName,
     DateTime ReleasedAt,
     string? PdfUrl);
 

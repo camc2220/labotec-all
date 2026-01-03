@@ -272,6 +272,7 @@ public class PatientsMeController : ControllerBase
                 r.TestName,
                 r.ResultValue,
                 r.Unit,
+                r.CreatedByName,
                 r.ReleasedAt,
                 r.PdfUrl))
             .ToListAsync();

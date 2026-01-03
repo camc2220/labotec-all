@@ -191,6 +191,10 @@ public class AppDbContext : IdentityDbContext<IdentityUser>
             entity.Property(r => r.Unit)
                 .IsRequired();
 
+            entity.Property(r => r.CreatedByName)
+                .IsRequired()
+                .HasMaxLength(160);
+
             entity.Property(r => r.PdfUrl)
                 .HasMaxLength(300);
 
