@@ -35,6 +35,45 @@ const resolvePatientName = (appointment) =>
 
 const resolveType = (appointment) => appointment?.type ?? 'Cita programada'
 
+const resolveAppointmentId = (value) =>
+  value?.id ?? value?.Id ?? value?.ID ?? value?.appointmentId ?? value?.AppointmentId ?? null
+
+const normalizeAppointment = (raw) => {
+  const scheduledAt =
+    raw?.scheduledAt ?? raw?.ScheduledAt ?? raw?.dateTime ?? raw?.DateTime ?? raw?.appointmentAt ?? raw?.AppointmentAt ?? null
+
+  const status = raw?.status ?? raw?.Status ?? raw?.appointmentStatus ?? raw?.AppointmentStatus ?? ''
+  const normalizedStatus = toAllowedStatus(status) || 'Scheduled'
+
+  const patientName =
+    raw?.patientName ??
+    raw?.PatientName ??
+    raw?.patient?.fullName ??
+    raw?.patient?.FullName ??
+    raw?.patient?.name ??
+    raw?.patient?.Name ??
+    raw?.Patient?.fullName ??
+    raw?.Patient?.FullName ??
+    raw?.Patient?.name ??
+    raw?.Patient?.Name ??
+    null
+
+  const type =
+    raw?.type ?? raw?.Type ?? raw?.appointmentType ?? raw?.AppointmentType ?? raw?.category ?? raw?.Category ?? 'Cita programada'
+
+  return {
+    ...raw,
+    id: resolveAppointmentId(raw),
+    patientName: patientName ?? raw?.patientName,
+    scheduledAt,
+    parsedDate: parseDate(scheduledAt),
+    status: status || normalizedStatus,
+    normalizedStatus,
+    type,
+    notes: raw?.notes ?? raw?.Notes ?? raw?.note ?? raw?.Note ?? '',
+  }
+}
+
 export default function NextTurnDisplay() {
   const { user } = useAuth()
   const [currentAppointment, setCurrentAppointment] = useState(null)
@@ -62,11 +101,7 @@ export default function NextTurnDisplay() {
         const now = Date.now()
         const appointments = getAppointmentsFromResponse(response)
         const candidates = appointments
-          .map((item) => ({
-            ...item,
-            parsedDate: parseDate(item.scheduledAt),
-            normalizedStatus: toAllowedStatus(item.status) || 'Scheduled',
-          }))
+          .map((item) => normalizeAppointment(item))
           .filter((item) => item.parsedDate && ACTIVE_QUEUE_STATUSES.has(item.normalizedStatus))
           .sort((a, b) => a.parsedDate - b.parsedDate)
 
