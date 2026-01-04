@@ -161,6 +161,10 @@ export default function Invoices() {
   const handleFormSubmit = async e => {
     e.preventDefault()
     if (isPatient || !canManage) return
+    if (editingItem && !editingItem.paid && formData.paid) {
+      const confirmed = window.confirm('¿Confirmas marcar esta factura como pagada?')
+      if (!confirmed) return
+    }
     setSaving(true)
     setFormError('')
     if (!formData.items || formData.items.length === 0) {
@@ -322,6 +326,10 @@ export default function Invoices() {
 
   const togglePaidStatus = async (row, paid) => {
     if (!canManage || isPatient) return
+    if (!row?.paid && paid) {
+      const confirmed = window.confirm('¿Confirmas marcar esta factura como pagada?')
+      if (!confirmed) return
+    }
 
     const id = resolveEntityId(row)
     if (!id) return
