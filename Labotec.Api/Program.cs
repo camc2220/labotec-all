@@ -75,7 +75,7 @@ builder.Services.AddSwaggerGen(c =>
 // =======================
 // DB CONTEXT (MySQL)
 // =======================
-var cs = builder.Configuration.GetConnectionString("Default");
+var cs = ResolveConnectionString(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseMySql(cs, ServerVersion.AutoDetect(cs)));
 
@@ -225,3 +225,48 @@ using (var scope = app.Services.CreateScope())
 await Seed.Run(app.Services);
 
 app.Run();
+
+string ResolveConnectionString(IConfiguration configuration)
+{
+    var configured = configuration.GetConnectionString("Default");
+    if (!string.IsNullOrWhiteSpace(configured))
+    {
+        return configured;
+    }
+
+    // Railway-managed MySQL variables
+    var host = configuration["MYSQLHOST"] ?? configuration["MYSQL_HOST"];
+    var database = configuration["MYSQLDATABASE"] ?? configuration["MYSQL_DATABASE"];
+    var user = configuration["MYSQLUSER"] ?? configuration["MYSQL_USER"];
+    var password = configuration["MYSQLPASSWORD"] ?? configuration["MYSQL_PASSWORD"];
+    var port = configuration["MYSQLPORT"] ?? configuration["MYSQL_PORT"] ?? "3306";
+
+    if (!string.IsNullOrWhiteSpace(host) &&
+        !string.IsNullOrWhiteSpace(database) &&
+        !string.IsNullOrWhiteSpace(user) &&
+        !string.IsNullOrWhiteSpace(password))
+    {
+        return $"Server={host};Port={port};Database={database};Uid={user};Pwd={password};SslMode=Preferred;";
+    }
+
+    // DATABASE_URL style (mysql://user:pass@host:port/db)
+    var dbUrl = configuration["DATABASE_URL"];
+    if (!string.IsNullOrWhiteSpace(dbUrl) && Uri.TryCreate(dbUrl, UriKind.Absolute, out var uri))
+    {
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var urlUser = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(0) ?? string.Empty);
+        var urlPassword = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(1) ?? string.Empty);
+        var urlPort = uri.Port > 0 ? uri.Port : 3306;
+        var urlDatabase = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+
+        if (!string.IsNullOrEmpty(uri.Host) &&
+            !string.IsNullOrEmpty(urlDatabase) &&
+            !string.IsNullOrEmpty(urlUser) &&
+            !string.IsNullOrEmpty(urlPassword))
+        {
+            return $"Server={uri.Host};Port={urlPort};Database={urlDatabase};Uid={urlUser};Pwd={urlPassword};SslMode=Preferred;";
+        }
+    }
+
+    throw new InvalidOperationException("ConnectionStrings:Default is not configured. Set it explicitly or provide MySQL variables (MYSQLHOST, MYSQLDATABASE, MYSQLUSER, MYSQLPASSWORD).");
+}

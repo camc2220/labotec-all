@@ -29,6 +29,7 @@ appsettings.Local.json
 appsettings.Development.json
 appsettings.*.json
 **/secrets.json
+!/Labotec.Api/appsettings.Template.json
 
 # Keys
 *.pfx

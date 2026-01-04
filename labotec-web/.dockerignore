@@ -1,0 +1,12 @@
+.git
+.github
+.gitignore
+node_modules
+dist
+npm-debug.log
+yarn-error.log
+*.local
+.env
+.env.*
+Dockerfile
+**/.DS_Store
