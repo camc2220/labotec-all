@@ -46,6 +46,7 @@ export default function Patients() {
     } catch (err) {
       console.error(err)
       setError('No pudimos cargar la lista de pacientes. Intenta nuevamente más tarde.')
+      setItems([])
     } finally {
       setLoading(false)
     }
@@ -58,6 +59,14 @@ export default function Patients() {
       setLoading(false)
     }
   }, [canView])
+
+  useEffect(() => {
+    if (!canView) return
+    const handler = setTimeout(() => {
+      fetchData(q)
+    }, 350)
+    return () => clearTimeout(handler)
+  }, [q, canView])
 
   const openForm = item => {
     if (!canManage) return
@@ -243,7 +252,7 @@ export default function Patients() {
           </div>
           <div className="flex flex-wrap gap-2">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
-            <button onClick={fetchData} className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Buscar</button>
+            <button onClick={() => fetchData(q)} className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Buscar</button>
             <button
               onClick={handleClearSearch}
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-gray-400"
