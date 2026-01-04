@@ -108,7 +108,9 @@ export default function NextTurnDisplay() {
         const inProgress = candidates.filter((item) => item.normalizedStatus === 'InProgress')
         const current =
           inProgress[0] ?? candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
-        const queue = candidates.filter((item) => item !== current).slice(0, 2)
+        const currentIndex = current ? candidates.findIndex((item) => item === current) : -1
+        const queueStart = currentIndex >= 0 ? currentIndex + 1 : 0
+        const queue = candidates.slice(queueStart, queueStart + 2)
 
         if (!cancelled) {
           setCurrentAppointment(current ?? null)
