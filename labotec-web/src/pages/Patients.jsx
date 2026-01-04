@@ -35,13 +35,13 @@ export default function Patients() {
     setEditingItem(null)
   }
 
-  const fetchData = async () => {
+  const fetchData = async (search = q) => {
     if (!canView) return
     setLoading(true)
     setError('')
     setSuccessMessage('')
     try {
-      const res = await api.get('/api/patients', { params: { q, page: 1, pageSize: 20, sortDir: 'asc' } })
+      const res = await api.get('/api/patients', { params: { q: search, page: 1, pageSize: 20, sortDir: 'asc' } })
       setItems(res.data.items ?? res.data.Items ?? [])
     } catch (err) {
       console.error(err)
@@ -80,6 +80,11 @@ export default function Patients() {
   const closeForm = () => {
     resetForm()
     setShowForm(false)
+  }
+
+  const handleClearSearch = () => {
+    setQ('')
+    fetchData('')
   }
 
   const handleFormSubmit = async e => {
@@ -239,6 +244,13 @@ export default function Patients() {
           <div className="flex flex-wrap gap-2">
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100" />
             <button onClick={fetchData} className="rounded-xl border border-sky-200 px-3 py-2 text-sm font-semibold text-sky-700 transition hover:bg-sky-50">Buscar</button>
+            <button
+              onClick={handleClearSearch}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-gray-400"
+              disabled={!q}
+            >
+              Limpiar
+            </button>
             {canManage && (
               <button onClick={() => openForm(null)} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Agregar paciente</button>
             )}
