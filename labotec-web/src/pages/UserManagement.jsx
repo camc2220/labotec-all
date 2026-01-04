@@ -20,6 +20,9 @@ const ROLE_OPTIONS = [
   { value: 'patient', label: ROLE_LABELS.patient },
 ]
 
+const CREATION_ROLE_OPTIONS = ROLE_OPTIONS.filter(option => option.value !== 'patient')
+const DEFAULT_CREATE_ROLE = CREATION_ROLE_OPTIONS[0]?.value ?? ROLE_OPTIONS[0].value
+
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Activo' },
   { value: 'inactive', label: 'Inactivo' },
@@ -62,7 +65,7 @@ export default function UserManagement() {
   const [successMessage, setSuccessMessage] = useState('')
   const [creating, setCreating] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newUser, setNewUser] = useState({ userName: '', email: '', role: 'patient', password: '' })
+  const [newUser, setNewUser] = useState({ userName: '', email: '', role: DEFAULT_CREATE_ROLE, password: '' })
   const [updatingMap, setUpdatingMap] = useState({})
   const [resettingMap, setResettingMap] = useState({})
   const [deletingMap, setDeletingMap] = useState({})
@@ -238,7 +241,7 @@ export default function UserManagement() {
       const res = await api.post('/api/users', payload)
       setItems(prev => [normalizeUsers([res.data])[0], ...prev])
       setSuccessMessage('Usuario creado correctamente.')
-      setNewUser({ userName: '', email: '', role: 'patient', password: '' })
+      setNewUser({ userName: '', email: '', role: DEFAULT_CREATE_ROLE, password: '' })
       setShowCreateForm(false)
     } catch (err) {
       console.error(err)
@@ -617,7 +620,7 @@ export default function UserManagement() {
                 value={newUser.role}
                 onChange={e => setNewUser(prev => ({ ...prev, role: e.target.value }))}
               >
-                {ROLE_OPTIONS.map(option => (
+                {CREATION_ROLE_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -630,7 +633,7 @@ export default function UserManagement() {
                 className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
                 onClick={() => {
                   setShowCreateForm(false)
-                  setNewUser({ userName: '', email: '', role: 'patient', password: '' })
+                  setNewUser({ userName: '', email: '', role: DEFAULT_CREATE_ROLE, password: '' })
                   setError('')
                   setSuccessMessage('')
                 }}

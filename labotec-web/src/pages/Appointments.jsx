@@ -12,6 +12,7 @@ import {
   canTransition,
   getAllowedTransitions,
   getNextStatus,
+  isRevertTransition,
   normalizeStatus,
   toAllowedStatus,
 } from '../lib/appointmentStatus'
@@ -32,6 +33,14 @@ const baseStatusOptions = [
   'NoShow',
   'Canceled',
 ]
+
+const STATUS_ENDPOINTS = {
+  CheckedIn: '/check-in',
+  InProgress: '/start',
+  Completed: '/complete',
+  NoShow: '/no-show',
+  Canceled: '/cancel',
+}
 
 // ✅ Horas permitidas (sin 12:00 Lun–Vie)
 const WEEKDAY_HOURS = [8, 9, 10, 11, 13, 14, 15, 16] // 08–17, bloquea 12, último turno 16:00
@@ -527,6 +536,38 @@ export default function Appointments() {
     else setAvailability([])
   }, [fetchAvailability, isAdmin])
 
+  const applyStatusChange = useCallback(
+    async (appointmentId, fromStatus, toStatus, options = {}) => {
+      const normalizedFrom = normalizeStatus(fromStatus) || 'Scheduled'
+      const normalizedTo = toAllowedStatus(toStatus)
+
+      if (!normalizedTo) throw new Error('Selecciona un estado válido.')
+      if (normalizedFrom === normalizedTo) return normalizedTo
+
+      if (!canTransition(normalizedFrom, normalizedTo) && !isRevertTransition(normalizedFrom, normalizedTo)) {
+        throw new Error('Transición no permitida para este estado.')
+      }
+
+      if (isRevertTransition(normalizedFrom, normalizedTo)) {
+        const providedReason = (options.reason || '').trim()
+        const reason = providedReason || (options.skipPrompt ? '' : (window.prompt('Escribe el motivo para revertir el estado:') || '').trim())
+        if (!reason || reason.length < 3) {
+          throw new Error('Debes ingresar un motivo (mínimo 3 caracteres) para revertir el estado.')
+        }
+        await api.put(`/api/appointments/${appointmentId}/revert`, { toStatus: normalizedTo, reason })
+      } else {
+        const path = STATUS_ENDPOINTS[normalizedTo]
+        if (!path) throw new Error('No hay endpoint configurado para este estado.')
+        await api.put(`/api/appointments/${appointmentId}${path}`)
+      }
+
+      await fetchData()
+      if (isAdmin) fetchAvailability()
+      return normalizedTo
+    },
+    [fetchAvailability, fetchData, isAdmin]
+  )
+
   const openForm = (item) => {
     if (!canEditAppointments) return
 
@@ -642,6 +683,7 @@ export default function Appointments() {
       const dt = buildLocalDateFromDayHour(formData.day, formData.hour)
       if (!dt) {
         setFormError('Debes seleccionar un día y una hora válidos.')
+        setSaving(false)
         return
       }
 
@@ -649,6 +691,7 @@ export default function Appointments() {
       const hoursCheck = isWithinBusinessHours(dt)
       if (!hoursCheck.ok) {
         setFormError(hoursCheck.reason)
+        setSaving(false)
         return
       }
 
@@ -658,6 +701,7 @@ export default function Appointments() {
         const afterNoon = now.getHours() >= 12
         if (afterNoon && isSameLocalDay(now, dt)) {
           setFormError('Después de las 12:00pm no se permiten citas para el mismo día. Elige otra fecha.')
+          setSaving(false)
           return
         }
       }
@@ -666,6 +710,7 @@ export default function Appointments() {
       const remaining = getRemainingSlots(formData.day, `${pad2(formData.hour)}:00`, currentId)
       if (remaining <= 0) {
         setFormError('No hay cupos disponibles para esa hora. Elige otra.')
+        setSaving(false)
         return
       }
 
@@ -683,33 +728,42 @@ export default function Appointments() {
 
       const id = editingItem?.id
       const resourceUrl = id ? `${endpoint}/${id}` : endpoint
+      const currentStatus = normalizeStatus(editingItem?.status) || editingItem?.status || 'Scheduled'
+      const desiredStatus = !isPatient ? (toAllowedStatus(formData.status) || currentStatus) : currentStatus
+      const statusChanged = Boolean(id && !isPatient && desiredStatus !== currentStatus)
 
       if (id) {
-        // update: staff requiere status; paciente no
         if (!isPatient) {
-          const st = String(formData.status || '').trim()
-          if (!st) {
+          if (!desiredStatus) {
             setFormError('Selecciona un estado.')
+            setSaving(false)
             return
           }
 
-          const previousStatus = normalizeStatus(editingItem?.status) || editingItem?.status || st
-          if (!canTransition(previousStatus, st)) {
+          if (!canTransition(currentStatus, desiredStatus) && !isRevertTransition(currentStatus, desiredStatus)) {
             setFormError('Transición de estado no permitida para este estado.')
+            setSaving(false)
             return
           }
 
-          payload.status = st
+          payload.status = currentStatus
         }
         await api.put(resourceUrl, payload)
+
+        if (statusChanged) {
+          await applyStatusChange(id, currentStatus, desiredStatus)
+        } else {
+          await fetchData()
+          if (isAdmin) fetchAvailability()
+        }
       } else {
         // create: no enviamos status (backend lo pone Scheduled)
         await api.post(resourceUrl, payload)
+        await fetchData()
+        if (isAdmin) fetchAvailability()
       }
 
       closeForm()
-      fetchData()
-      if (isAdmin) fetchAvailability()
     } catch (err) {
       console.error(err)
       setFormError(getApiMessage(err, 'No pudimos guardar la cita. Revisa los datos e intenta nuevamente.'))
@@ -746,7 +800,7 @@ export default function Appointments() {
     }
 
     const currentStatus = normalizeStatus(row.status) || row.status || ''
-    if (!canTransition(currentStatus, statusToSend)) {
+    if (!canTransition(currentStatus, statusToSend) && !isRevertTransition(currentStatus, statusToSend)) {
       setStatusError('Transición no permitida para este estado.')
       return
     }
@@ -755,21 +809,8 @@ export default function Appointments() {
     setStatusError('')
 
     try {
-      const { day, hour } = extractLocalDayHour(row.scheduledAt)
-      const scheduledAt = buildScheduledAt(day, hour) || row.scheduledAt
-
-      const payload = {
-        scheduledAt,
-        type: String(row.type || '').trim(),
-        status: statusToSend,
-        notes: String(row.notes || '').trim(),
-        patientId: row.patientId || null,
-      }
-
-      await api.put(`/api/appointments/${row.id}`, payload)
-
-      setItems((prev) => prev.map((x) => (x.id === row.id ? { ...x, status: payload.status } : x)))
-      if (isAdmin) fetchAvailability()
+      await applyStatusChange(row.id, currentStatus, statusToSend)
+      setStatusError('')
     } catch (err) {
       console.error(err)
       setStatusError(getApiMessage(err, 'No pudimos cambiar el estado.'))

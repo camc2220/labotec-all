@@ -3,27 +3,42 @@ import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { ACTIVE_QUEUE_STATUSES, normalizeStatus, toAllowedStatus } from '../lib/appointmentStatus'
 
-const REFRESH_INTERVAL_MS = 30000
+const REFRESH_INTERVAL_MS = 5000
+const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
 const getAppointmentsFromResponse = (response) =>
   response?.data?.items ?? response?.data?.Items ?? response?.data ?? []
 
 const parseDate = (value) => {
-  if (!value) return null
-  const date = new Date(value)
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  const str = String(value ?? '').trim()
+  if (!str) return null
+
+  const hasTimezone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(str)
+  const isoNoTz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/
+
+  if (!hasTimezone && isoNoTz.test(str)) {
+    const asUtc = new Date(`${str}Z`)
+    if (!Number.isNaN(asUtc.getTime())) return asUtc
+  }
+
+  const date = new Date(str)
   return Number.isNaN(date.getTime()) ? null : date
 }
 
 const formatTime = (value) => {
   const date = parseDate(value)
   if (!date) return '—'
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', timeZone: SANTO_DOMINGO_TZ })
 }
 
 const formatDay = (value) => {
   const date = parseDate(value)
   if (!date) return '—'
-  return date.toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long' })
+  return date.toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', timeZone: SANTO_DOMINGO_TZ })
 }
 
 const resolvePatientName = (appointment) =>
@@ -35,9 +50,49 @@ const resolvePatientName = (appointment) =>
 
 const resolveType = (appointment) => appointment?.type ?? 'Cita programada'
 
+const resolveAppointmentId = (value) =>
+  value?.id ?? value?.Id ?? value?.ID ?? value?.appointmentId ?? value?.AppointmentId ?? null
+
+const normalizeAppointment = (raw) => {
+  const scheduledAt =
+    raw?.scheduledAt ?? raw?.ScheduledAt ?? raw?.dateTime ?? raw?.DateTime ?? raw?.appointmentAt ?? raw?.AppointmentAt ?? null
+
+  const status = raw?.status ?? raw?.Status ?? raw?.appointmentStatus ?? raw?.AppointmentStatus ?? ''
+  const normalizedStatus = toAllowedStatus(status) || normalizeStatus(status) || ''
+
+  const patientName =
+    raw?.patientName ??
+    raw?.PatientName ??
+    raw?.patient?.fullName ??
+    raw?.patient?.FullName ??
+    raw?.patient?.name ??
+    raw?.patient?.Name ??
+    raw?.Patient?.fullName ??
+    raw?.Patient?.FullName ??
+    raw?.Patient?.name ??
+    raw?.Patient?.Name ??
+    null
+
+  const type =
+    raw?.type ?? raw?.Type ?? raw?.appointmentType ?? raw?.AppointmentType ?? raw?.category ?? raw?.Category ?? 'Cita programada'
+
+  return {
+    ...raw,
+    id: resolveAppointmentId(raw),
+    patientName: patientName ?? raw?.patientName,
+    scheduledAt,
+    parsedDate: parseDate(scheduledAt),
+    status: status || normalizedStatus,
+    normalizedStatus,
+    type,
+    notes: raw?.notes ?? raw?.Notes ?? raw?.note ?? raw?.Note ?? '',
+  }
+}
+
 export default function NextTurnDisplay() {
   const { user } = useAuth()
-  const [nextAppointment, setNextAppointment] = useState(null)
+  const [currentAppointment, setCurrentAppointment] = useState(null)
+  const [queueAppointments, setQueueAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -56,23 +111,25 @@ export default function NextTurnDisplay() {
       setError('')
       try {
         const response = await api.get('/api/appointments', {
-          params: { page: 1, pageSize: 100, sortDir: 'asc' },
+          params: { page: 1, pageSize: 100, sortBy: 'ScheduledAt', sortDir: 'asc' },
         })
-        const appointments = getAppointmentsFromResponse(response)
         const now = Date.now()
+        const appointments = getAppointmentsFromResponse(response)
         const candidates = appointments
-          .map((item) => ({
-            ...item,
-            parsedDate: parseDate(item.scheduledAt),
-            normalizedStatus: toAllowedStatus(item.status) || 'Scheduled',
-          }))
+          .map((item) => normalizeAppointment(item))
           .filter((item) => item.parsedDate && ACTIVE_QUEUE_STATUSES.has(item.normalizedStatus))
           .sort((a, b) => a.parsedDate - b.parsedDate)
 
-        const upcoming = candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
+        const inProgress = candidates.filter((item) => item.normalizedStatus === 'InProgress')
+        const current =
+          inProgress[0] ?? candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
+        const currentIndex = current ? candidates.findIndex((item) => item === current) : -1
+        const queueStart = currentIndex >= 0 ? currentIndex + 1 : 0
+        const queue = candidates.slice(queueStart, queueStart + 2)
 
         if (!cancelled) {
-          setNextAppointment(upcoming ?? null)
+          setCurrentAppointment(current ?? null)
+          setQueueAppointments(queue)
           setLastUpdated(new Date())
         }
       } catch (err) {
@@ -125,7 +182,7 @@ export default function NextTurnDisplay() {
             <div className="flex items-center gap-3 text-sm text-slate-200">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Actualización automática cada 30 segundos
+                Actualización automática cada {REFRESH_INTERVAL_MS / 1000} segundos
               </span>
             </div>
           </div>
@@ -138,28 +195,53 @@ export default function NextTurnDisplay() {
 
           {loading ? (
             <div className="flex min-h-[260px] items-center justify-center text-lg text-slate-200">Cargando turno...</div>
-          ) : nextAppointment ? (
+          ) : currentAppointment ? (
             <div className="grid gap-6 sm:grid-cols-[2fr_1fr]">
               <div className="rounded-3xl bg-white/10 p-8 shadow-xl ring-1 ring-white/10">
-                <p className="text-sm uppercase tracking-[0.14em] text-sky-200">Paciente</p>
+                <p className="text-sm uppercase tracking-[0.14em] text-sky-200">
+                  {currentAppointment.normalizedStatus === 'InProgress' ? 'Turno en atención' : 'Próximo turno'}
+                </p>
                 <h2 className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">
-                  {resolvePatientName(nextAppointment)}
+                  {resolvePatientName(currentAppointment)}
                 </h2>
-                <p className="mt-3 text-lg text-slate-100">{resolveType(nextAppointment)}</p>
-                {nextAppointment.notes && (
-                  <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-slate-100/90">{nextAppointment.notes}</p>
+                <p className="mt-3 text-lg text-slate-100">{resolveType(currentAppointment)}</p>
+                {currentAppointment.notes && (
+                  <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-slate-100/90">
+                    {currentAppointment.notes}
+                  </p>
                 )}
               </div>
 
               <div className="flex flex-col gap-4 rounded-3xl bg-white/5 p-6 shadow-lg ring-1 ring-white/10">
                 <div className="rounded-2xl bg-white/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.16em] text-sky-200">Hora</p>
-                  <p className="mt-1 text-3xl font-bold">{formatTime(nextAppointment.scheduledAt)}</p>
-                  <p className="text-sm text-slate-200">{formatDay(nextAppointment.scheduledAt)}</p>
+                  <p className="mt-1 text-3xl font-bold">{formatTime(currentAppointment.scheduledAt)}</p>
+                  <p className="text-sm text-slate-200">{formatDay(currentAppointment.scheduledAt)}</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.16em] text-sky-200">Estado</p>
-                  <p className="mt-1 text-xl font-semibold">{nextAppointment.status || 'Confirmada'}</p>
+                  <p className="mt-1 text-xl font-semibold">{currentAppointment.status || 'Confirmada'}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-sky-200">En cola</p>
+                  {queueAppointments.length > 0 ? (
+                    <ul className="mt-2 space-y-2 text-sm text-slate-100">
+                      {queueAppointments.map((item) => (
+                        <li key={`${item.id}-${item.scheduledAt}`} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{resolvePatientName(item)}</p>
+                            <p className="text-xs text-slate-300">{resolveType(item)}</p>
+                          </div>
+                          <div className="text-right text-xs text-slate-200">
+                            <p className="font-medium">{formatTime(item.scheduledAt)}</p>
+                            <p className="text-slate-300">{item.normalizedStatus || item.status || 'Pendiente'}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-200/80">Solo queda este turno en la cola.</p>
+                  )}
                 </div>
               </div>
             </div>
