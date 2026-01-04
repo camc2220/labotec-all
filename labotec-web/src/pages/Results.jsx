@@ -61,6 +61,7 @@ export default function Results() {
   const [selectedResultIds, setSelectedResultIds] = useState([])
   const [labTests, setLabTests] = useState([])
   const [loadingTests, setLoadingTests] = useState(false)
+  const [resultLimit, setResultLimit] = useState('10')
 
   const isPatient = user?.role === 'patient'
   const displayUserName = user?.name ?? 'Usuario'
@@ -85,7 +86,7 @@ export default function Results() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.get(endpoint, { params: { page: 1, pageSize: 20, sortDir: 'desc' } })
+      const res = await api.get(endpoint, { params: { page: 1, pageSize: 200, sortDir: 'desc' } })
       setItems(res.data.items ?? res.data.Items ?? [])
     } catch (err) {
       console.error(err)
@@ -102,6 +103,13 @@ export default function Results() {
   useEffect(() => {
     loadLabTests()
   }, [])
+
+  const visibleItems = useMemo(() => {
+    if (resultLimit === 'all') return items
+    const limitNumber = Number(resultLimit)
+    if (Number.isNaN(limitNumber) || limitNumber <= 0) return items
+    return items.slice(0, limitNumber)
+  }, [items, resultLimit])
 
   const findLabTestMatch = testName => {
     if (!testName) return null
@@ -433,12 +441,35 @@ export default function Results() {
           </div>
         </div>
 
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="results-limit">Mostrar</label>
+            <select
+              id="results-limit"
+              value={resultLimit}
+              onChange={e => setResultLimit(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="10">Últimas 10</option>
+              <option value="20">Últimas 20</option>
+              <option value="50">Últimas 50</option>
+              <option value="all">Todas</option>
+            </select>
+          </div>
+          <div className="text-xs text-gray-600">
+            <span>Mostrando {visibleItems.length} de {items.length} resultados</span>
+            {resultLimit !== 'all' && items.length > visibleItems.length && (
+              <span className="ml-2">Usa "Todas" para ver todos los resultados</span>
+            )}
+          </div>
+        </div>
+
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
           {loading ? (
             <div className="text-sm text-gray-600">Cargando...</div>
-          ) : items.length > 0 ? (
-            <Table columns={columns} data={items} />
+          ) : visibleItems.length > 0 ? (
+            <Table columns={columns} data={visibleItems} />
           ) : (
             <div className="text-sm text-gray-500">{isPatient ? 'Aún no tienes resultados disponibles.' : 'No hay resultados registrados.'}</div>
           )}
