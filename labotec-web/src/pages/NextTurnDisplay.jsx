@@ -43,7 +43,7 @@ const normalizeAppointment = (raw) => {
     raw?.scheduledAt ?? raw?.ScheduledAt ?? raw?.dateTime ?? raw?.DateTime ?? raw?.appointmentAt ?? raw?.AppointmentAt ?? null
 
   const status = raw?.status ?? raw?.Status ?? raw?.appointmentStatus ?? raw?.AppointmentStatus ?? ''
-  const normalizedStatus = toAllowedStatus(status) || 'Scheduled'
+  const normalizedStatus = toAllowedStatus(status) || normalizeStatus(status) || ''
 
   const patientName =
     raw?.patientName ??
