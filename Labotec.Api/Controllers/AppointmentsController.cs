@@ -185,9 +185,11 @@ public class AppointmentsController : ControllerBase
             q = q.Where(a => a.Status == status);
         }
 
+        var effectiveSortBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Appointment.ScheduledAt) : sortBy;
+
         var total = await q.CountAsync();
         var data = await q
-            .ApplyOrdering(sortBy, sortDir)
+            .ApplyOrdering(effectiveSortBy, sortDir)
             .ApplyPaging(page, pageSize)
             .Select(a => new AppointmentReadDto(
                 a.Id,

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Labotec.Api.Common;
 using Labotec.Api.Data;
+using Labotec.Api.Domain;
 using Labotec.Api.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -106,10 +107,12 @@ public class PatientsMeController : ControllerBase
         if (upcoming)
             query = query.Where(a => a.ScheduledAt >= DateTime.UtcNow);
 
+        var effectiveSortBy = string.IsNullOrWhiteSpace(sortBy) ? nameof(Appointment.ScheduledAt) : sortBy;
+
         var total = await query.CountAsync();
 
         var data = await query
-            .ApplyOrdering(sortBy, sortDir)
+            .ApplyOrdering(effectiveSortBy, sortDir)
             .ApplyPaging(page, pageSize)
             .Select(a => new AppointmentReadDto(
                 a.Id,

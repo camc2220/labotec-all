@@ -96,7 +96,7 @@ export default function NextTurnDisplay() {
       setError('')
       try {
         const response = await api.get('/api/appointments', {
-          params: { page: 1, pageSize: 100, sortDir: 'asc' },
+          params: { page: 1, pageSize: 100, sortBy: 'ScheduledAt', sortDir: 'asc' },
         })
         const now = Date.now()
         const appointments = getAppointmentsFromResponse(response)
