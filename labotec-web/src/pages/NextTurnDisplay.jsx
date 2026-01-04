@@ -35,9 +35,49 @@ const resolvePatientName = (appointment) =>
 
 const resolveType = (appointment) => appointment?.type ?? 'Cita programada'
 
+const resolveAppointmentId = (value) =>
+  value?.id ?? value?.Id ?? value?.ID ?? value?.appointmentId ?? value?.AppointmentId ?? null
+
+const normalizeAppointment = (raw) => {
+  const scheduledAt =
+    raw?.scheduledAt ?? raw?.ScheduledAt ?? raw?.dateTime ?? raw?.DateTime ?? raw?.appointmentAt ?? raw?.AppointmentAt ?? null
+
+  const status = raw?.status ?? raw?.Status ?? raw?.appointmentStatus ?? raw?.AppointmentStatus ?? ''
+  const normalizedStatus = toAllowedStatus(status) || 'Scheduled'
+
+  const patientName =
+    raw?.patientName ??
+    raw?.PatientName ??
+    raw?.patient?.fullName ??
+    raw?.patient?.FullName ??
+    raw?.patient?.name ??
+    raw?.patient?.Name ??
+    raw?.Patient?.fullName ??
+    raw?.Patient?.FullName ??
+    raw?.Patient?.name ??
+    raw?.Patient?.Name ??
+    null
+
+  const type =
+    raw?.type ?? raw?.Type ?? raw?.appointmentType ?? raw?.AppointmentType ?? raw?.category ?? raw?.Category ?? 'Cita programada'
+
+  return {
+    ...raw,
+    id: resolveAppointmentId(raw),
+    patientName: patientName ?? raw?.patientName,
+    scheduledAt,
+    parsedDate: parseDate(scheduledAt),
+    status: status || normalizedStatus,
+    normalizedStatus,
+    type,
+    notes: raw?.notes ?? raw?.Notes ?? raw?.note ?? raw?.Note ?? '',
+  }
+}
+
 export default function NextTurnDisplay() {
   const { user } = useAuth()
-  const [nextAppointment, setNextAppointment] = useState(null)
+  const [currentAppointment, setCurrentAppointment] = useState(null)
+  const [queueAppointments, setQueueAppointments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -61,18 +101,18 @@ export default function NextTurnDisplay() {
         const appointments = getAppointmentsFromResponse(response)
         const now = Date.now()
         const candidates = appointments
-          .map((item) => ({
-            ...item,
-            parsedDate: parseDate(item.scheduledAt),
-            normalizedStatus: toAllowedStatus(item.status) || 'Scheduled',
-          }))
+          .map((item) => normalizeAppointment(item))
           .filter((item) => item.parsedDate && ACTIVE_QUEUE_STATUSES.has(item.normalizedStatus))
           .sort((a, b) => a.parsedDate - b.parsedDate)
 
-        const upcoming = candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
+        const inProgress = candidates.filter((item) => item.normalizedStatus === 'InProgress')
+        const current =
+          inProgress[0] ?? candidates.find((item) => item.parsedDate.getTime() >= now) ?? candidates[0]
+        const queue = candidates.filter((item) => item !== current).slice(0, 2)
 
         if (!cancelled) {
-          setNextAppointment(upcoming ?? null)
+          setCurrentAppointment(current ?? null)
+          setQueueAppointments(queue)
           setLastUpdated(new Date())
         }
       } catch (err) {
@@ -138,28 +178,53 @@ export default function NextTurnDisplay() {
 
           {loading ? (
             <div className="flex min-h-[260px] items-center justify-center text-lg text-slate-200">Cargando turno...</div>
-          ) : nextAppointment ? (
+          ) : currentAppointment ? (
             <div className="grid gap-6 sm:grid-cols-[2fr_1fr]">
               <div className="rounded-3xl bg-white/10 p-8 shadow-xl ring-1 ring-white/10">
-                <p className="text-sm uppercase tracking-[0.14em] text-sky-200">Paciente</p>
+                <p className="text-sm uppercase tracking-[0.14em] text-sky-200">
+                  {currentAppointment.normalizedStatus === 'InProgress' ? 'Turno en atención' : 'Próximo turno'}
+                </p>
                 <h2 className="mt-2 text-4xl font-extrabold leading-tight sm:text-5xl">
-                  {resolvePatientName(nextAppointment)}
+                  {resolvePatientName(currentAppointment)}
                 </h2>
-                <p className="mt-3 text-lg text-slate-100">{resolveType(nextAppointment)}</p>
-                {nextAppointment.notes && (
-                  <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-slate-100/90">{nextAppointment.notes}</p>
+                <p className="mt-3 text-lg text-slate-100">{resolveType(currentAppointment)}</p>
+                {currentAppointment.notes && (
+                  <p className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-sm text-slate-100/90">
+                    {currentAppointment.notes}
+                  </p>
                 )}
               </div>
 
               <div className="flex flex-col gap-4 rounded-3xl bg-white/5 p-6 shadow-lg ring-1 ring-white/10">
                 <div className="rounded-2xl bg-white/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.16em] text-sky-200">Hora</p>
-                  <p className="mt-1 text-3xl font-bold">{formatTime(nextAppointment.scheduledAt)}</p>
-                  <p className="text-sm text-slate-200">{formatDay(nextAppointment.scheduledAt)}</p>
+                  <p className="mt-1 text-3xl font-bold">{formatTime(currentAppointment.scheduledAt)}</p>
+                  <p className="text-sm text-slate-200">{formatDay(currentAppointment.scheduledAt)}</p>
                 </div>
                 <div className="rounded-2xl bg-white/10 px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.16em] text-sky-200">Estado</p>
-                  <p className="mt-1 text-xl font-semibold">{nextAppointment.status || 'Confirmada'}</p>
+                  <p className="mt-1 text-xl font-semibold">{currentAppointment.status || 'Confirmada'}</p>
+                </div>
+                <div className="rounded-2xl bg-white/10 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-sky-200">En cola</p>
+                  {queueAppointments.length > 0 ? (
+                    <ul className="mt-2 space-y-2 text-sm text-slate-100">
+                      {queueAppointments.map((item) => (
+                        <li key={`${item.id}-${item.scheduledAt}`} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold">{resolvePatientName(item)}</p>
+                            <p className="text-xs text-slate-300">{resolveType(item)}</p>
+                          </div>
+                          <div className="text-right text-xs text-slate-200">
+                            <p className="font-medium">{formatTime(item.scheduledAt)}</p>
+                            <p className="text-slate-300">{item.normalizedStatus || item.status || 'Pendiente'}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-200/80">Solo queda este turno en la cola.</p>
+                  )}
                 </div>
               </div>
             </div>
