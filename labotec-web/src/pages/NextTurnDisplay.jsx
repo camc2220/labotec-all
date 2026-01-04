@@ -3,7 +3,7 @@ import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import { ACTIVE_QUEUE_STATUSES, normalizeStatus, toAllowedStatus } from '../lib/appointmentStatus'
 
-const REFRESH_INTERVAL_MS = 30000
+const REFRESH_INTERVAL_MS = 5000
 
 const getAppointmentsFromResponse = (response) =>
   response?.data?.items ?? response?.data?.Items ?? response?.data ?? []
@@ -167,7 +167,7 @@ export default function NextTurnDisplay() {
             <div className="flex items-center gap-3 text-sm text-slate-200">
               <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Actualización automática cada 30 segundos
+                Actualización automática cada {REFRESH_INTERVAL_MS / 1000} segundos
               </span>
             </div>
           </div>
