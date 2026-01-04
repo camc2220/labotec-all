@@ -25,13 +25,20 @@ export const APPOINTMENT_STATUS_SET = new Set(APPOINTMENT_STATUSES)
 export const STATUS_FLOW = ['Scheduled', 'CheckedIn', 'InProgress', 'Completed']
 export const ACTIVE_QUEUE_STATUSES = new Set(['Scheduled', 'CheckedIn', 'InProgress'])
 
+// Incluimos los retrocesos permitidos por el backend (/revert)
 const ALLOWED_TRANSITIONS = {
   Scheduled: ['Scheduled', 'CheckedIn', 'InProgress', 'Completed', 'Canceled', 'NoShow'],
-  CheckedIn: ['CheckedIn', 'InProgress', 'Completed', 'Canceled', 'NoShow'],
-  InProgress: ['InProgress', 'Completed', 'Canceled'],
-  Completed: ['Completed'],
+  CheckedIn: ['CheckedIn', 'Scheduled', 'InProgress', 'Completed', 'Canceled', 'NoShow'],
+  InProgress: ['InProgress', 'CheckedIn', 'Completed', 'Canceled'],
+  Completed: ['Completed', 'InProgress'],
   NoShow: ['NoShow'],
   Canceled: ['Canceled'],
+}
+
+const REVERT_TRANSITIONS = {
+  CheckedIn: new Set(['Scheduled']),
+  InProgress: new Set(['CheckedIn']),
+  Completed: new Set(['InProgress']),
 }
 
 export const normalizeStatus = (value) => {
@@ -71,4 +78,13 @@ export const getAllowedTransitions = (from) => {
   const allowed = ALLOWED_TRANSITIONS[current] || [current]
   const unique = new Set([current, ...allowed])
   return Array.from(unique).filter((status) => APPOINTMENT_STATUS_SET.has(normalizeStatus(status)))
+}
+
+export const isRevertTransition = (from, to) => {
+  const current = normalizeStatus(from)
+  const target = normalizeStatus(to)
+  if (!current || !target) return false
+
+  const revertTargets = REVERT_TRANSITIONS[current]
+  return revertTargets ? revertTargets.has(target) : false
 }
