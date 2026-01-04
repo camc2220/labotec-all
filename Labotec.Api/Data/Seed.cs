@@ -192,17 +192,6 @@ public static class Seed
         var labTestsByCode = await db.LabTests
             .ToDictionaryAsync(t => t.Code, t => t.Id);
 
-        record ReferenceRangeSpec(
-            string Code,
-            string? Sex = null,
-            int? AgeMinYears = null,
-            int? AgeMaxYears = null,
-            decimal? MinValue = null,
-            decimal? MaxValue = null,
-            string? TextRange = null,
-            string? Unit = null,
-            string? Notes = null);
-
         var referenceRanges = new List<ReferenceRangeSpec>
         {
             new("ALB", MinValue: 3.5m, MaxValue: 5.0m, Unit: "g/dL"),
@@ -301,3 +290,14 @@ public static class Seed
         }
     }
 }
+
+file record ReferenceRangeSpec(
+    string Code,
+    string? Sex = null,
+    int? AgeMinYears = null,
+    int? AgeMaxYears = null,
+    decimal? MinValue = null,
+    decimal? MaxValue = null,
+    string? TextRange = null,
+    string? Unit = null,
+    string? Notes = null);
