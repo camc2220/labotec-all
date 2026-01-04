@@ -180,9 +180,10 @@ public static class Seed
             ["VITD"] = "30 - 100 ng/mL"
         };
 
-        var labTestsWithMissingReferenceValue = await db.LabTests
+        var labTestsWithMissingReferenceValue = (await db.LabTests
+                .ToListAsync())
             .Where(t => referenceTexts.ContainsKey(t.Code) && string.IsNullOrWhiteSpace(t.ReferenceValue))
-            .ToListAsync();
+            .ToList();
 
         foreach (var test in labTestsWithMissingReferenceValue)
         {
