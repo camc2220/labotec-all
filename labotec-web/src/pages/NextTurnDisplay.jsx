@@ -4,26 +4,41 @@ import { useAuth } from '../context/AuthContext'
 import { ACTIVE_QUEUE_STATUSES, normalizeStatus, toAllowedStatus } from '../lib/appointmentStatus'
 
 const REFRESH_INTERVAL_MS = 5000
+const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
 const getAppointmentsFromResponse = (response) =>
   response?.data?.items ?? response?.data?.Items ?? response?.data ?? []
 
 const parseDate = (value) => {
-  if (!value) return null
-  const date = new Date(value)
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  const str = String(value ?? '').trim()
+  if (!str) return null
+
+  const hasTimezone = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(str)
+  const isoNoTz = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/
+
+  if (!hasTimezone && isoNoTz.test(str)) {
+    const asUtc = new Date(`${str}Z`)
+    if (!Number.isNaN(asUtc.getTime())) return asUtc
+  }
+
+  const date = new Date(str)
   return Number.isNaN(date.getTime()) ? null : date
 }
 
 const formatTime = (value) => {
   const date = parseDate(value)
   if (!date) return '—'
-  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', timeZone: SANTO_DOMINGO_TZ })
 }
 
 const formatDay = (value) => {
   const date = parseDate(value)
   if (!date) return '—'
-  return date.toLocaleDateString('es-ES', { weekday: 'long', day: '2-digit', month: 'long' })
+  return date.toLocaleDateString('es-DO', { weekday: 'long', day: '2-digit', month: 'long', timeZone: SANTO_DOMINGO_TZ })
 }
 
 const resolvePatientName = (appointment) =>
