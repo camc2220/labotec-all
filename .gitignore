@@ -61,7 +61,6 @@ pnpm-debug.log*
 .env.production
 .env.development
 /labotec-web/.env.example
-/labotec-web/src/lib/api.js
 /Labotec.Api/appsettings.json
 
 ##############################
