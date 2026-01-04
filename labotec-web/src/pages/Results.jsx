@@ -62,6 +62,9 @@ export default function Results() {
   const [labTests, setLabTests] = useState([])
   const [loadingTests, setLoadingTests] = useState(false)
   const [resultLimit, setResultLimit] = useState('10')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const isPatient = user?.role === 'patient'
   const displayUserName = user?.name ?? 'Usuario'
@@ -104,12 +107,51 @@ export default function Results() {
     loadLabTests()
   }, [])
 
+  const invalidDateRange = useMemo(() => {
+    if (!startDate || !endDate) return false
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    return start > end
+  }, [startDate, endDate])
+
+  const filteredItems = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    const startValue = startDate ? new Date(`${startDate}T00:00:00`) : null
+    const endValue = endDate ? new Date(`${endDate}T23:59:59`) : null
+
+    return items.filter(row => {
+      const releaseDate = row.releasedAt ? new Date(row.releasedAt) : null
+      const releaseValid = releaseDate && !Number.isNaN(releaseDate.getTime())
+
+      if (invalidDateRange) return false
+      if (startValue || endValue) {
+        if (!releaseValid) return false
+        if (startValue && releaseDate < startValue) return false
+        if (endValue && releaseDate > endValue) return false
+      }
+
+      if (!term) return true
+
+      const values = [
+        row.testName,
+        row.patientName,
+        row.patientId ? `paciente ${row.patientId}` : '',
+        row.resultValue,
+        row.unit,
+        row.createdByName,
+        row.releasedAt ? formatDateTime(row.releasedAt) : '',
+      ]
+
+      return values.some(value => value && value.toString().toLowerCase().includes(term))
+    })
+  }, [items, searchTerm, startDate, endDate, invalidDateRange])
+
   const visibleItems = useMemo(() => {
-    if (resultLimit === 'all') return items
+    if (resultLimit === 'all') return filteredItems
     const limitNumber = Number(resultLimit)
-    if (Number.isNaN(limitNumber) || limitNumber <= 0) return items
-    return items.slice(0, limitNumber)
-  }, [items, resultLimit])
+    if (Number.isNaN(limitNumber) || limitNumber <= 0) return filteredItems
+    return filteredItems.slice(0, limitNumber)
+  }, [filteredItems, resultLimit])
 
   const findLabTestMatch = testName => {
     if (!testName) return null
@@ -441,7 +483,18 @@ export default function Results() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="results-search">Buscar</label>
+            <input
+              id="results-search"
+              type="search"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Número, paciente o prueba"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
           <div className="space-y-1">
             <label className="text-sm text-gray-700" htmlFor="results-limit">Mostrar</label>
             <select
@@ -456,13 +509,44 @@ export default function Results() {
               <option value="all">Todas</option>
             </select>
           </div>
-          <div className="text-xs text-gray-600">
-            <span>Mostrando {visibleItems.length} de {items.length} resultados</span>
-            {resultLimit !== 'all' && items.length > visibleItems.length && (
-              <span className="ml-2">Usa "Todas" para ver todos los resultados</span>
-            )}
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="results-start-date">Desde</label>
+            <input
+              id="results-start-date"
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              placeholder="mm/dd/yyyy"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm text-gray-700" htmlFor="results-end-date">Hasta</label>
+            <input
+              id="results-end-date"
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              placeholder="mm/dd/yyyy"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
           </div>
         </div>
+        {invalidDateRange && (
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            El rango de fechas es inválido. La fecha inicial debe ser anterior o igual a la final.
+          </div>
+        )}
+        {(searchTerm || startDate || endDate) && !invalidDateRange && (
+          <div className="mt-2 text-xs text-gray-600">
+            Mostrando {visibleItems.length} de {filteredItems.length} resultados filtrados
+          </div>
+        )}
+        {(!searchTerm && !startDate && !endDate) && (
+          <div className="mt-2 text-xs text-gray-600">
+            Mostrando {visibleItems.length} de {items.length} resultados
+          </div>
+        )}
 
         <div className="mt-4 space-y-3">
           {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
