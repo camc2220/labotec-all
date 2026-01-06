@@ -30,7 +30,7 @@ public class PatientsController : ControllerBase
     }
 
     private bool IsStaffRead() =>
-        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Facturacion");
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Facturacion") || User.IsInRole("Bioanalista");
 
     private bool IsStaffWrite() =>
         User.IsInRole("Admin") || User.IsInRole("Recepcion");

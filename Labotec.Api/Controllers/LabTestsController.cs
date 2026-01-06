@@ -11,7 +11,7 @@ namespace Labotec.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Recepcion,Facturacion")]
+[Authorize(Roles = "Admin,Recepcion,Facturacion,Bioanalista")]
 public class LabTestsController : ControllerBase
 {
     private readonly AppDbContext _db;
