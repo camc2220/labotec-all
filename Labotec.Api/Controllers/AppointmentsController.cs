@@ -412,9 +412,11 @@ namespace Labotec.Api.Controllers;
 public class AppointmentsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private const string StaffRoles = "Admin,Recepcion,Bioanalista";
     public AppointmentsController(AppDbContext db) => _db = db;
 
-    private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private bool IsStaff() =>
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
 
     private string GetCurrentUserId()
         => User.FindFirstValue(ClaimTypes.NameIdentifier)
