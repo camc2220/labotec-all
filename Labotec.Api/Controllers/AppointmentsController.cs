@@ -16,9 +16,11 @@ namespace Labotec.Api.Controllers;
 public class AppointmentsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private const string StaffRoles = "Admin,Recepcion,Bioanalista";
     public AppointmentsController(AppDbContext db) => _db = db;
 
-    private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private bool IsStaff() =>
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
 
     private string GetCurrentUserId()
         => User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -205,7 +207,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Create([FromBody] AppointmentCreateDto dto)
     {
         if (dto.PatientId == Guid.Empty) return BadRequest("PatientId es requerido");
@@ -256,7 +258,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Update(Guid id, [FromBody] AppointmentUpdateDto dto)
     {
         var a = await _db.Appointments.Include(x => x.Patient).FirstOrDefaultAsync(x => x.Id == id);
@@ -309,7 +311,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/check-in")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> CheckIn(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -323,7 +325,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/start")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Start(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -337,7 +339,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/complete")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Complete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -351,7 +353,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/no-show")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> NoShow(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -365,7 +367,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/cancel")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Cancel(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -379,7 +381,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -410,9 +412,11 @@ namespace Labotec.Api.Controllers;
 public class AppointmentsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private const string StaffRoles = "Admin,Recepcion,Bioanalista";
     public AppointmentsController(AppDbContext db) => _db = db;
 
-    private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private bool IsStaff() =>
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
 
     private string GetCurrentUserId()
         => User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -722,7 +726,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Create([FromBody] AppointmentCreateDto dto)
     {
         if (dto.PatientId == Guid.Empty) return BadRequest("PatientId es requerido");
@@ -781,7 +785,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Update(Guid id, [FromBody] AppointmentUpdateDto dto)
     {
         var a = await _db.Appointments.Include(x => x.Patient).FirstOrDefaultAsync(x => x.Id == id);
@@ -844,7 +848,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/check-in")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> CheckIn(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -858,7 +862,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/start")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Start(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -872,7 +876,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/complete")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Complete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -886,7 +890,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/no-show")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> NoShow(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -900,7 +904,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/cancel")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Cancel(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);
@@ -915,7 +919,7 @@ public class AppointmentsController : ControllerBase
 
     // 🔥 NUEVO: ROLLBACK ENDPOINT
     [HttpPut("{id:guid}/revert")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<AppointmentReadDto>> Revert(Guid id, [FromBody] AppointmentRevertDto body)
     {
         if (body is null) return BadRequest("Body requerido.");
@@ -974,7 +978,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var a = await _db.Appointments.FindAsync(id);

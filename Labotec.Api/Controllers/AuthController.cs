@@ -40,7 +40,7 @@ namespace Labotec.Api.Controllers
             if (roles is null || roles.Count == 0) return null;
 
             // Prioridad (ajusta si quieres)
-            string[] priority = { "Admin", "Recepcion", "Facturacion", "Paciente" };
+            string[] priority = { "Admin", "Recepcion", "Facturacion", "Bioanalista", "Paciente" };
             foreach (var p in priority)
             {
                 var hit = roles.FirstOrDefault(r => string.Equals(r, p, StringComparison.OrdinalIgnoreCase));

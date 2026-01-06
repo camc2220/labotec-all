@@ -16,13 +16,15 @@ namespace Labotec.Api.Controllers;
 public class LabOrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private const string StaffRoles = "Admin,Recepcion,Bioanalista";
 
     public LabOrdersController(AppDbContext db)
     {
         _db = db;
     }
 
-    private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private bool IsStaff() =>
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<LabOrderReadDto>>> Get(
@@ -134,7 +136,7 @@ public class LabOrdersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<LabOrderReadDto>> Create([FromBody] LabOrderCreateDto dto)
     {
         if (dto.TestIds is null || !dto.TestIds.Any())
@@ -199,7 +201,7 @@ public class LabOrdersController : ControllerBase
     }
 
     [HttpPut("{id:guid}/status")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] LabOrderStatusUpdateDto dto)
     {
         var o = await _db.LabOrders.FindAsync(id);
@@ -212,7 +214,7 @@ public class LabOrdersController : ControllerBase
     }
 
     [HttpPut("items/{itemId:guid}/status")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> UpdateItemStatus(Guid itemId, [FromBody] LabOrderItemStatusUpdateDto dto)
     {
         var item = await _db.LabOrderItems.FindAsync(itemId);
