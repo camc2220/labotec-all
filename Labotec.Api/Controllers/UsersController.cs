@@ -36,7 +36,7 @@ public class UsersController : ControllerBase
     {
         if (roles is null || roles.Count == 0) return null;
 
-        string[] priority = { "Admin", "Recepcion", "Facturacion", "Paciente" };
+        string[] priority = { "Admin", "Recepcion", "Facturacion", "Bioanalista", "Paciente" };
         foreach (var p in priority)
         {
             var hit = roles.FirstOrDefault(r => string.Equals(r, p, StringComparison.OrdinalIgnoreCase));

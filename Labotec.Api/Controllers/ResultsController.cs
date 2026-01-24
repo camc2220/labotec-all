@@ -19,7 +19,10 @@ public class ResultsController : ControllerBase
     private readonly AppDbContext _db;
     public ResultsController(AppDbContext db) => _db = db;
 
-    private bool IsStaff() => User.IsInRole("Admin") || User.IsInRole("Recepcion");
+    private const string StaffRoles = "Admin,Recepcion,Bioanalista";
+
+    private bool IsStaff() =>
+        User.IsInRole("Admin") || User.IsInRole("Recepcion") || User.IsInRole("Bioanalista");
     private string GetActorName() => User?.Identity?.Name ?? "Desconocido";
 
     [HttpGet]
@@ -140,7 +143,7 @@ public class ResultsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<ActionResult<LabResultReadDto>> Create([FromBody] LabResultCreateDto dto)
     {
         var patient = await _db.Patients.FindAsync(dto.PatientId);
@@ -174,7 +177,7 @@ public class ResultsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Update(Guid id, [FromBody] LabResultUpdateDto dto)
     {
         var r = await _db.LabResults.FindAsync(id);
@@ -192,7 +195,7 @@ public class ResultsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     public async Task<IActionResult> Delete(Guid id)
     {
         var r = await _db.LabResults.FindAsync(id);
@@ -204,7 +207,7 @@ public class ResultsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/pdf")]
-    [Authorize(Roles = "Admin,Recepcion")]
+    [Authorize(Roles = StaffRoles)]
     [RequestSizeLimit(20_000_000)]
     public async Task<IActionResult> UploadPdf(Guid id, IFormFile file, [FromServices] IStorageService storage)
     {
